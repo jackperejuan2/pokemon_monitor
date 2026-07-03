@@ -58,7 +58,7 @@ def _retry_after_seconds(response: httpx.Response) -> float:
         value = response.json().get("retry_after")
         if value is not None:
             return float(value)
-    except (ValueError, AttributeError):
+    except (ValueError, TypeError, AttributeError):
         pass
     header = response.headers.get("Retry-After")
     if header is not None:

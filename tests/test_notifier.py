@@ -90,6 +90,24 @@ def test_send_retries_on_429_then_succeeds():
     assert count["n"] == 2
 
 
+def test_send_survives_non_numeric_retry_after(monkeypatch):
+    async def fast_sleep(_delay):
+        return None
+
+    monkeypatch.setattr(asyncio, "sleep", fast_sleep)
+    count = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        count["n"] += 1
+        if count["n"] == 1:
+            return httpx.Response(429, json={"retry_after": []})
+        return httpx.Response(204)
+
+    notifier = Notifier(WEBHOOK, transport=httpx.MockTransport(handler))
+    asyncio.run(notifier.send(EMBED))
+    assert count["n"] == 2
+
+
 def test_send_gives_up_after_three_failures_without_raising(monkeypatch):
     async def fast_sleep(_delay):
         return None
