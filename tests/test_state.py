@@ -90,3 +90,63 @@ def test_load_state_empty_when_missing(tmp_path, monkeypatch):
 
     monkeypatch.setattr(state_module, "STATE_PATH", tmp_path / "nope.json")
     assert state_module.load_state() == {}
+
+
+def test_load_state_corrupt_json_returns_empty(tmp_path, monkeypatch):
+    import state as state_module
+
+    path = tmp_path / "state.json"
+    path.write_text("{invalid")
+    monkeypatch.setattr(state_module, "STATE_PATH", path)
+    assert state_module.load_state() == {}
+
+
+def test_save_state_atomic_leaves_no_tmp_and_parses(tmp_path, monkeypatch):
+    import json
+
+    import state as state_module
+
+    path = tmp_path / "state.json"
+    monkeypatch.setattr(state_module, "STATE_PATH", path)
+    state_module.save_state({"bestbuy:1": ProductState(status="in_stock")})
+    assert not path.with_suffix(".json.tmp").exists()
+    assert json.loads(path.read_text())
+
+
+def test_corrupt_last_over_price_alert_fails_open():
+    prev = ProductState(
+        status="in_stock", price_ok=False, last_over_price_alert="not-a-date"
+    )
+    d = decide(prev, in_stock("89.99"), PRODUCT, NOW)
+    assert d.alert == "over_price"
+
+
+def test_load_state_ignores_unknown_keys(tmp_path, monkeypatch):
+    import json
+
+    import state as state_module
+
+    path = tmp_path / "state.json"
+    path.write_text(
+        json.dumps(
+            {"bestbuy:1": {"status": "in_stock", "price_ok": True, "future_field": 1}}
+        )
+    )
+    monkeypatch.setattr(state_module, "STATE_PATH", path)
+    loaded = state_module.load_state()
+    assert loaded == {"bestbuy:1": ProductState(status="in_stock", price_ok=True)}
+
+
+def test_price_flake_while_price_ok_keeps_state_and_no_alert():
+    prev = ProductState(status="in_stock", price_ok=True)
+    d = decide(prev, in_stock(None), PRODUCT, NOW)
+    assert d.alert is None
+    assert d.new_state.price_ok is True
+    assert d.new_state.status == "in_stock"
+
+
+def test_confirmed_over_price_while_price_ok_still_alerts():
+    prev = ProductState(status="in_stock", price_ok=True)
+    d = decide(prev, in_stock("89.99"), PRODUCT, NOW)
+    assert d.alert == "over_price"
+    assert d.new_state.price_ok is False
