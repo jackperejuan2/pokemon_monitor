@@ -72,3 +72,47 @@ def test_no_signal_is_unknown():
 
 def test_malformed_json_falls_back_to_markers():
     assert parse_stock_from_html(BAD_JSON_HTML).status is Status.IN_STOCK
+
+
+TYPE_LIST_HTML = """
+<html><head>
+<script type="application/ld+json">
+{"@type":["Product","Thing"],"name":"ETB",
+ "offers":{"price":"64.99","availability":"https://schema.org/InStock"}}
+</script>
+</head></html>
+"""
+
+NAN_PRICE_HTML = """
+<html><head>
+<script type="application/ld+json">
+{"@type":"Product","name":"ETB",
+ "offers":{"price":"NaN","availability":"https://schema.org/InStock"}}
+</script>
+</head></html>
+"""
+
+
+def test_deeply_nested_jsonld_does_not_crash():
+    # Loop-construct ~3000 levels of nesting. Built as a string because
+    # json.dumps itself hits RecursionError on a dict this deep.
+    blob = '{"x": ' * 3000 + '{"@type": "Product"}' + "}" * 3000
+    html = (
+        '<html><head><script type="application/ld+json">'
+        + blob
+        + "</script></head><body><p>welcome</p></body></html>"
+    )
+    result = parse_stock_from_html(html)
+    assert result.status is Status.UNKNOWN
+
+
+def test_type_list_is_recognized_as_product():
+    r = parse_stock_from_html(TYPE_LIST_HTML)
+    assert r.status is Status.IN_STOCK
+    assert r.price == Decimal("64.99")
+
+
+def test_non_finite_price_becomes_none():
+    r = parse_stock_from_html(NAN_PRICE_HTML)
+    assert r.status is Status.IN_STOCK
+    assert r.price is None

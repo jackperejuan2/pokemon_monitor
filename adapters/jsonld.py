@@ -21,7 +21,8 @@ def parse_stock_from_html(html: str, url: str = "") -> StockResult:
     for match in LDJSON_RE.finditer(html):
         try:
             data = json.loads(match.group(1))
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, RecursionError):
+            # RecursionError: pathologically deep JSON; degrade to markers.
             continue
         for node in _product_nodes(data):
             result = _result_from_product_node(node, url)
@@ -30,16 +31,25 @@ def parse_stock_from_html(html: str, url: str = "") -> StockResult:
     return _fallback_from_markers(html, url)
 
 
-def _product_nodes(data: object) -> Iterator[dict]:
+MAX_DEPTH = 20
+
+
+def _is_product_type(value: object) -> bool:
+    return value == "Product" or (isinstance(value, list) and "Product" in value)
+
+
+def _product_nodes(data: object, depth: int = 0) -> Iterator[dict]:
+    if depth > MAX_DEPTH:
+        return
     if isinstance(data, list):
         for item in data:
-            yield from _product_nodes(item)
+            yield from _product_nodes(item, depth + 1)
     elif isinstance(data, dict):
-        if data.get("@type") == "Product":
+        if _is_product_type(data.get("@type")):
             yield data
         for value in data.values():
             if isinstance(value, (list, dict)):
-                yield from _product_nodes(value)
+                yield from _product_nodes(value, depth + 1)
 
 
 def _result_from_product_node(node: dict, url: str) -> StockResult | None:
@@ -62,6 +72,8 @@ def _result_from_product_node(node: dict, url: str) -> StockResult | None:
             price = Decimal(str(raw_price))
         except InvalidOperation:
             price = None
+    if price is not None and not price.is_finite():
+        price = None
     return StockResult(status=status, price=price, title=node.get("name", ""), url=url)
 
 
