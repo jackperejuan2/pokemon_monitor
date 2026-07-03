@@ -9,7 +9,7 @@ import httpx
 from .base import Product, Status, StockResult, raise_if_blocked
 
 NEXT_DATA_RE = re.compile(
-    r'<script id="__NEXT_DATA__" type="application/json"[^>]*>(.*?)</script>',
+    r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>',
     re.DOTALL,
 )
 
@@ -23,6 +23,8 @@ def parse_next_data(html: str, url: str = "") -> StockResult:
         product = data["props"]["pageProps"]["initialData"]["data"]["product"]
     except (json.JSONDecodeError, KeyError, TypeError):
         return StockResult(status=Status.UNKNOWN, url=url)
+    if not isinstance(product, dict):
+        return StockResult(status=Status.UNKNOWN, url=url)
 
     availability = str(product.get("availabilityStatus", "")).upper()
     if availability == "IN_STOCK":
@@ -33,7 +35,9 @@ def parse_next_data(html: str, url: str = "") -> StockResult:
         status = Status.UNKNOWN
 
     price: Decimal | None = None
-    raw = (product.get("priceInfo") or {}).get("currentPrice") or {}
+    price_info = product.get("priceInfo")
+    raw = price_info.get("currentPrice") if isinstance(price_info, dict) else None
+    raw = raw if isinstance(raw, dict) else {}
     if raw.get("price") is not None:
         try:
             price = Decimal(str(raw["price"]))
