@@ -6,7 +6,7 @@
 
 **Architecture:** One async Python process. A scheduler loop dispatches per-product checks to per-retailer adapters (HTTP-first via `httpx`; Playwright for Pokemon Center). A pure state-transition function (`state.decide`) turns check results into at-most-one alert per restock. Discord webhook notifier. JSON files for watchlist/config/state. `launchd` keeps it alive.
 
-**Tech Stack:** Python 3.12, httpx, Playwright (Chromium), pytest. No database.
+**Tech Stack:** Python 3.9+ (system Python on this Mac is 3.9.6; every module needs `from __future__ import annotations` for the `X | Y` type hints), httpx, Playwright (Chromium), pytest. No database.
 
 **Spec:** `docs/superpowers/specs/2026-07-03-pokemon-restock-monitor-design.md`
 
