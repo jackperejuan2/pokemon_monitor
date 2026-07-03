@@ -15,7 +15,10 @@ def parse_availability(payload: dict) -> Status:
     availabilities = payload.get("availabilities") or []
     if not availabilities:
         return Status.UNKNOWN
-    shipping = availabilities[0].get("shipping") or {}
+    entry = availabilities[0]
+    if not isinstance(entry, dict):
+        return Status.UNKNOWN
+    shipping = entry.get("shipping") or {}
     purchasable = shipping.get("purchasable", False)
     status_text = str(shipping.get("status", "")).lower()
     if purchasable and "instock" in status_text:
@@ -27,12 +30,16 @@ def parse_price(offers: list) -> Decimal | None:
     if not offers:
         return None
     offer = offers[0]
-    raw = offer.get("salePrice") or offer.get("regularPrice")
+    raw = offer.get("salePrice")
+    if raw is None:
+        raw = offer.get("regularPrice")
     return Decimal(str(raw)) if raw is not None else None
 
 
 class BestBuyAdapter:
     async def check(self, client: httpx.AsyncClient, product: Product) -> StockResult:
+        if not product.sku:
+            return StockResult(status=Status.UNKNOWN, title=product.name, url=product.url)
         response = await client.get(
             AVAILABILITY_URL,
             params={
