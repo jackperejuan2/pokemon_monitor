@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 import httpx
 
 from adapters.base import Product, StockResult
+
+log = logging.getLogger("notifier")
 
 COLOR_RESTOCK = 0x2ECC71      # green
 COLOR_OVER_PRICE = 0xF1C40F   # yellow
@@ -48,11 +53,46 @@ def build_heartbeat_embed(product_count: int, unhealthy: list[str]) -> dict:
     }
 
 
+def _retry_after_seconds(response: httpx.Response) -> float:
+    try:
+        value = response.json().get("retry_after")
+        if value is not None:
+            return float(value)
+    except (ValueError, AttributeError):
+        pass
+    header = response.headers.get("Retry-After")
+    if header is not None:
+        try:
+            return float(header)
+        except ValueError:
+            pass
+    return 1.0
+
+
 class Notifier:
-    def __init__(self, webhook_url: str):
+    def __init__(self, webhook_url: str, transport: httpx.AsyncBaseTransport | None = None):
         self.webhook_url = webhook_url
+        self._transport = transport
 
     async def send(self, embed: dict) -> None:
-        async with httpx.AsyncClient(timeout=15) as client:
-            response = await client.post(self.webhook_url, json={"embeds": [embed]})
-            response.raise_for_status()
+        async with httpx.AsyncClient(timeout=15, transport=self._transport) as client:
+            last_error = ""
+            for attempt in range(1, 4):
+                try:
+                    response = await client.post(self.webhook_url, json={"embeds": [embed]})
+                except httpx.HTTPError as exc:
+                    last_error = repr(exc)
+                    delay = 1.0
+                else:
+                    if response.is_success:
+                        return
+                    last_error = f"HTTP {response.status_code}"
+                    if response.status_code == 429:
+                        delay = _retry_after_seconds(response)
+                    else:
+                        delay = 1.0
+                if attempt < 3:
+                    await asyncio.sleep(min(delay, 10))
+            log.warning(
+                "Discord webhook send failed after 3 attempts: %s", last_error
+            )
