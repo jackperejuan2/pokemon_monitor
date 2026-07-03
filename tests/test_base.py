@@ -30,3 +30,13 @@ def test_raise_if_blocked_raises_on_block_codes(code):
 def test_raise_if_blocked_passes_normal_responses():
     resp = httpx.Response(200, request=httpx.Request("GET", "https://www.example.ca/p"))
     raise_if_blocked(resp)  # no exception
+
+
+def test_registry_covers_all_seven_retailers():
+    from adapters import ADAPTERS
+
+    assert set(ADAPTERS) == {
+        "bestbuy", "walmart", "toysrus", "indigo", "ebgames", "costco", "pokemoncenter",
+    }
+    for adapter in ADAPTERS.values():
+        assert callable(getattr(adapter, "check", None))
