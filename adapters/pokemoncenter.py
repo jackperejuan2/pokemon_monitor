@@ -14,7 +14,19 @@ CHALLENGE_MARKERS = ("access denied", "_incapsula_", "pardon our interruption", 
 
 # PROFILE_DIR is a shared Chromium user-data-dir guarded by a SingletonLock;
 # concurrent launches against it hang/throw, so serialize browser sessions.
-_BROWSER_LOCK = asyncio.Lock()
+_BROWSER_LOCK: asyncio.Lock | None = None
+
+
+def _browser_lock() -> asyncio.Lock:
+    # Created lazily inside the running loop: on Python 3.9 asyncio.Lock()
+    # eagerly binds get_event_loop() at creation, so a module-level instance
+    # would bind the wrong loop and raise under contention inside asyncio.run.
+    # The singleton binds the first loop that calls it — correct for this
+    # project's single-asyncio.run-per-process model.
+    global _BROWSER_LOCK
+    if _BROWSER_LOCK is None:
+        _BROWSER_LOCK = asyncio.Lock()
+    return _BROWSER_LOCK
 
 
 def is_challenge_page(html: str) -> bool:
@@ -29,7 +41,7 @@ class PokemonCenterAdapter:
     async def check(self, client: httpx.AsyncClient, product: Product) -> StockResult:
         # `client` is unused: Pokemon Center blocks plain HTTP.
         PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-        async with _BROWSER_LOCK:
+        async with _browser_lock():
             async with async_playwright() as p:
                 context = await p.chromium.launch_persistent_context(
                     str(PROFILE_DIR),

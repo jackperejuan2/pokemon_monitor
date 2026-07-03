@@ -2,8 +2,7 @@ import asyncio
 
 import pytest
 
-import adapters.pokemoncenter
-from adapters.pokemoncenter import is_challenge_page
+from adapters.pokemoncenter import _browser_lock, is_challenge_page
 
 
 @pytest.mark.parametrize(
@@ -23,21 +22,19 @@ def test_normal_page_is_not_challenge():
 
 
 def test_concurrent_checks_serialize_on_browser_lock():
-    lock = adapters.pokemoncenter._BROWSER_LOCK
-    assert isinstance(lock, asyncio.Lock)
+    order = []
 
-    async def holds_and_blocks_second_acquire():
-        async with lock:
-            assert lock.locked()
-            # A second acquire must not complete while the lock is held.
-            waiter = asyncio.ensure_future(lock.acquire())
-            await asyncio.sleep(0)
-            assert not waiter.done()
-            waiter.cancel()
-            try:
-                await waiter
-            except asyncio.CancelledError:
-                pass
-        assert not lock.locked()
+    async def critical_section(name):
+        async with _browser_lock():
+            order.append(f"{name}:enter")
+            await asyncio.sleep(0.01)
+            order.append(f"{name}:exit")
 
-    asyncio.run(holds_and_blocks_second_acquire())
+    async def main():
+        lock = _browser_lock()
+        assert isinstance(lock, asyncio.Lock)
+        assert _browser_lock() is lock  # singleton
+        await asyncio.gather(critical_section("a"), critical_section("b"))
+
+    asyncio.run(main())
+    assert order == ["a:enter", "a:exit", "b:enter", "b:exit"]
