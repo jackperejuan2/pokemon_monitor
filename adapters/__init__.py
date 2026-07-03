@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .base import Adapter
 from .bestbuy import BestBuyAdapter
 from .jsonld import JsonLdAdapter
