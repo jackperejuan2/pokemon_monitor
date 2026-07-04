@@ -40,3 +40,19 @@ def test_registry_covers_all_seven_retailers():
     }
     for adapter in ADAPTERS.values():
         assert callable(getattr(adapter, "check", None))
+
+
+def test_product_has_packs_and_set_defaults():
+    from decimal import Decimal
+    from adapters.base import Product
+    p = Product(name="x", retailer="bestbuy", url="https://x", max_price=Decimal("90"))
+    assert p.packs == 1
+    assert p.set_name == ""
+
+
+def test_product_accepts_packs_and_set():
+    from decimal import Decimal
+    from adapters.base import Product
+    p = Product(name="x", retailer="bestbuy", url="https://x", max_price=Decimal("90"),
+                packs=9, set_name="151")
+    assert p.packs == 9 and p.set_name == "151"

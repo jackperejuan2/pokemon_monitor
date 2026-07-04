@@ -21,6 +21,8 @@ class Product:
     url: str
     max_price: Decimal
     sku: str | None = None
+    packs: int = 1
+    set_name: str = ""
 
     @property
     def key(self) -> str:

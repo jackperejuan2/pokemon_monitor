@@ -203,3 +203,18 @@ def test_interval_overrides_ignored_for_unlisted_retailer():
     }
     for _ in range(50):
         assert 120 <= check_interval(product("bestbuy"), config, h) <= 300
+
+
+def test_load_watchlist_reads_packs_and_set(tmp_path, monkeypatch):
+    import json
+    import monitor
+    wl = tmp_path / "watchlist.json"
+    wl.write_text(json.dumps({"products": [
+        {"name": "A", "retailer": "bestbuy", "url": "https://a", "max_price": 90, "sku": "1",
+         "packs": 9, "set": "151"},
+        {"name": "B", "retailer": "walmart", "url": "https://b", "max_price": 60},
+    ]}))
+    monkeypatch.setattr(monitor, "WATCHLIST_PATH", wl)
+    products = monitor.load_watchlist()
+    assert products[0].packs == 9 and products[0].set_name == "151"
+    assert products[1].packs == 1 and products[1].set_name == "Other"

@@ -80,6 +80,8 @@ def load_watchlist() -> list[Product]:
             url=entry["url"],
             max_price=Decimal(str(entry["max_price"])),
             sku=entry.get("sku"),
+            packs=int(entry.get("packs", 1)),
+            set_name=entry.get("set", "Other"),
         )
         for entry in data["products"]
     ]
