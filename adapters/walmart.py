@@ -74,7 +74,7 @@ class WalmartAdapter:
 
         # httpx path was blocked (403/429, or a PerimeterX /blocked redirect,
         # or a px-captcha interstitial) -- fall back to a real browser.
-        fallback_html = await fetch_page_html(product.url, profile=PROFILE_NAME)
+        fallback_html = await fetch_page_html(product.url, profile=PROFILE_NAME, headless=True)
         if looks_blocked(fallback_html):
             raise Blocked("walmart blocked both http and browser")
         return parse_next_data(fallback_html, product.url)

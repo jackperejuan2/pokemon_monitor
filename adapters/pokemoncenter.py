@@ -39,6 +39,7 @@ class PokemonCenterAdapter:
             is_challenge=is_challenge_page,
             retries=2,
             retry_wait_ms=10_000,
+            channel="chrome",
         )
         if is_challenge_page(html):
             raise Blocked("pokemoncenter served a challenge page")

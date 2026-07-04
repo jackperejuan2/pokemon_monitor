@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from adapters.browser import _browser_lock as browser_module_lock
+from adapters.browser import build_launch_kwargs
 from adapters.browser import is_challenge_page as browser_module_is_challenge_page
 from adapters.pokemoncenter import _browser_lock, is_challenge_page
 
@@ -51,3 +52,25 @@ def test_concurrent_checks_serialize_on_browser_lock():
 
     asyncio.run(main())
     assert order == ["a:enter", "a:exit", "b:enter", "b:exit"]
+
+
+def test_build_launch_kwargs_default():
+    kwargs = build_launch_kwargs()
+    assert kwargs["headless"] is False
+    assert "channel" not in kwargs
+    assert "args" not in kwargs
+    assert "ignore_default_args" not in kwargs
+    assert kwargs["viewport"] == {"width": 1280, "height": 900}
+    assert kwargs["locale"] == "en-CA"
+
+
+def test_build_launch_kwargs_headless():
+    kwargs = build_launch_kwargs(headless=True)
+    assert kwargs["headless"] is True
+
+
+def test_build_launch_kwargs_channel_chrome():
+    kwargs = build_launch_kwargs(channel="chrome")
+    assert kwargs["channel"] == "chrome"
+    assert "--disable-blink-features=AutomationControlled" in kwargs["args"]
+    assert "--enable-automation" in kwargs["ignore_default_args"]

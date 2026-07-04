@@ -100,7 +100,9 @@ class JsonLdAdapter:
         return parse_stock_from_html(response.text, product.url)
 
     async def _check_via_browser(self, product: Product) -> StockResult:
-        fallback_html = await fetch_page_html(product.url, profile=f"{product.retailer}-profile")
+        fallback_html = await fetch_page_html(
+            product.url, profile=f"{product.retailer}-profile", headless=True
+        )
         if is_challenge_page(fallback_html):
             raise Blocked(f"{product.retailer} served a challenge page")
         return parse_stock_from_html(fallback_html, product.url)
