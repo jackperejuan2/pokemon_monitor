@@ -7,7 +7,8 @@ from typing import Iterator
 
 import httpx
 
-from .base import Product, Status, StockResult, raise_if_blocked
+from .base import Blocked, Product, Status, StockResult, raise_if_blocked
+from .browser import fetch_page_html, is_challenge_page
 
 LDJSON_RE = re.compile(
     r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
@@ -90,7 +91,16 @@ class JsonLdAdapter:
     """Generic adapter for retailers whose product pages carry schema.org JSON-LD."""
 
     async def check(self, client: httpx.AsyncClient, product: Product) -> StockResult:
-        response = await client.get(product.url)
-        raise_if_blocked(response)
-        response.raise_for_status()
+        try:
+            response = await client.get(product.url)
+            raise_if_blocked(response)
+            response.raise_for_status()
+        except Blocked:
+            return await self._check_via_browser(product)
         return parse_stock_from_html(response.text, product.url)
+
+    async def _check_via_browser(self, product: Product) -> StockResult:
+        fallback_html = await fetch_page_html(product.url, profile=f"{product.retailer}-profile")
+        if is_challenge_page(fallback_html):
+            raise Blocked(f"{product.retailer} served a challenge page")
+        return parse_stock_from_html(fallback_html, product.url)

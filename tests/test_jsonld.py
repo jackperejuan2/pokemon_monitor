@@ -1,7 +1,12 @@
+import asyncio
 from decimal import Decimal
 
-from adapters.base import Status
-from adapters.jsonld import parse_stock_from_html
+import httpx
+import pytest
+
+import adapters.jsonld as jsonld_module
+from adapters.base import Blocked, Product, Status
+from adapters.jsonld import JsonLdAdapter, parse_stock_from_html
 
 IN_STOCK_HTML = """
 <html><head>
@@ -116,3 +121,47 @@ def test_non_finite_price_becomes_none():
     r = parse_stock_from_html(NAN_PRICE_HTML)
     assert r.status is Status.IN_STOCK
     assert r.price is None
+
+
+PRODUCT = Product(
+    name="Pokemon TCG Booster Bundle", retailer="ebgames",
+    url="https://www.ebgames.ca/p/x", max_price=Decimal("34.99"),
+)
+
+
+def test_adapter_falls_back_to_browser_on_403(monkeypatch):
+    async def fake_get(self, url, *a, **kw):
+        return httpx.Response(403, text="forbidden", request=httpx.Request("GET", url))
+
+    async def fake_fetch(url, profile, **kw):
+        assert profile == "ebgames-profile"
+        return IN_STOCK_HTML
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    monkeypatch.setattr(jsonld_module, "fetch_page_html", fake_fetch)
+
+    async def main():
+        async with httpx.AsyncClient() as client:
+            return await JsonLdAdapter().check(client, PRODUCT)
+
+    result = asyncio.run(main())
+    assert result.status is Status.IN_STOCK
+    assert result.price == Decimal("64.99")
+
+
+def test_adapter_raises_blocked_when_browser_fallback_is_challenge_page(monkeypatch):
+    async def fake_get(self, url, *a, **kw):
+        return httpx.Response(403, text="forbidden", request=httpx.Request("GET", url))
+
+    async def fake_fetch(url, profile, **kw):
+        return "<html><body>Just a moment...</body></html>"
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    monkeypatch.setattr(jsonld_module, "fetch_page_html", fake_fetch)
+
+    async def main():
+        async with httpx.AsyncClient() as client:
+            return await JsonLdAdapter().check(client, PRODUCT)
+
+    with pytest.raises(Blocked):
+        asyncio.run(main())
