@@ -77,3 +77,20 @@ def test_in_stock_with_no_price_does_not_set_lowest():
     assert changed is True
     assert rec.last_price is None
     assert rec.lowest_price is None
+
+
+def test_equal_price_different_string_is_not_a_change():
+    prev = DashboardRecord(last_price="19.99", last_status="in_stock", lowest_price="19.99",
+                           last_checked=NOW.isoformat(), last_changed=NOW.isoformat())
+    rec, changed = update_record(prev, in_stock("19.990"), LATER)
+    assert changed is False
+    assert rec.last_changed == NOW.isoformat()
+
+
+def test_in_stock_price_flake_keeps_last_known_price():
+    prev = DashboardRecord(last_price="80.00", last_status="in_stock", lowest_price="80.00",
+                           last_checked=NOW.isoformat(), last_changed=NOW.isoformat())
+    rec, changed = update_record(prev, in_stock(None), LATER)
+    assert rec.last_price == "80.00"
+    assert changed is False
+    assert rec.last_changed == NOW.isoformat()

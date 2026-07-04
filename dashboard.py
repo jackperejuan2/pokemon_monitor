@@ -22,6 +22,12 @@ class DashboardRecord:
     last_changed: str | None = None     # ISO timestamp
 
 
+def _price_changed(new_price: str | None, old_price: str | None) -> bool:
+    if new_price is None or old_price is None:
+        return new_price != old_price
+    return Decimal(new_price) != Decimal(old_price)
+
+
 def update_record(prev: DashboardRecord, result: StockResult, now: datetime):
     """Returns (new_record, changed). changed is True when the current price or
     status differs from prev. UNKNOWN results never overwrite known data."""
@@ -42,12 +48,21 @@ def update_record(prev: DashboardRecord, result: StockResult, now: datetime):
     new_status = result.status.value
     new_price = None if result.price is None else format(result.price, "f")
 
+    # Price-flake tolerance mirrors state.py: an IN_STOCK result whose price
+    # scrapes as None must not blank a previously known price.
+    if (
+        result.status is Status.IN_STOCK
+        and result.price is None
+        and prev.last_price is not None
+    ):
+        new_price = prev.last_price
+
     lowest = prev.lowest_price
     if result.price is not None:
         if lowest is None or result.price < Decimal(lowest):
             lowest = new_price
 
-    changed = (new_price != prev.last_price) or (new_status != prev.last_status)
+    changed = _price_changed(new_price, prev.last_price) or (new_status != prev.last_status)
     return (
         DashboardRecord(
             last_price=new_price,
