@@ -1,29 +1,31 @@
 {
   "products": [
-    {
-      "name": "Mega Evolution Chaos Rising Booster Bundle",
-      "retailer": "bestbuy",
-      "sku": "19893174",
-      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-chaos-rising-booster-bundle/19893174",
-      "max_price": 34.99
-    },
-    {
-      "name": "Mega Evolution Chaos Rising Booster Bundle",
-      "retailer": "pokemoncenter",
-      "url": "https://www.pokemoncenter.com/en-ca/product/10-10403-109/pokemon-tcg-mega-evolution-chaos-rising-booster-bundle",
-      "max_price": 34.99
-    },
-    {
-      "name": "Mega Evolution Chaos Rising Booster Bundle",
-      "retailer": "walmart",
-      "url": "https://www.walmart.ca/en/ip/Pokemon-Trading-Card-Games-Mega-Evolution-Chaos-Rising-Booster-Bundle/6Z5CLX0MKJ39",
-      "max_price": 34.99
-    },
-    {
-      "name": "Mega Evolution Chaos Rising Booster Bundle",
-      "retailer": "ebgames",
-      "url": "https://www.ebgames.ca/Trading%20Cards/Games/965102/pokemon-trading-card-game-meega-evolution-chaos-rising-booster-bundle",
-      "max_price": 34.99
-    }
+    {"name": "151 Elite Trainer Box", "retailer": "bestbuy", "sku": "17460267", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-3-5-pokemon-151-elite-trainer/17460267", "max_price": 90.00},
+    {"name": "151 Booster Bundle", "retailer": "bestbuy", "sku": "17812308", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-151-booster-bundle/17812308", "max_price": 60.00},
+    {"name": "151 Single Booster Pack", "retailer": "bestbuy", "sku": "19462667", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-scarlet-violet-151-booster-pack-x1/19462667", "max_price": 10.00},
+
+    {"name": "Prismatic Evolutions Elite Trainer Box", "retailer": "bestbuy", "sku": "19277006", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-prismatic-evolutions-elite-trainer-box/19277006", "max_price": 90.00},
+    {"name": "Prismatic Evolutions Booster Bundle", "retailer": "bestbuy", "sku": "19383898", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-prismatic-evolutions-booster-bundle/19383898", "max_price": 60.00},
+
+    {"name": "Surging Sparks Elite Trainer Box", "retailer": "bestbuy", "sku": "19355896", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-sv-surging-sparks-elite-trainer-box/19355896", "max_price": 90.00},
+    {"name": "Surging Sparks Booster Box (36 packs)", "retailer": "bestbuy", "sku": "19383002", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-surging-sparks-booster-box-36-packs/19383002", "max_price": 360.00},
+    {"name": "Surging Sparks Booster Bundle", "retailer": "bestbuy", "sku": "19383210", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-surging-sparks-booster-bundle/19383210", "max_price": 60.00},
+    {"name": "Surging Sparks Sleeved Booster Pack", "retailer": "bestbuy", "sku": "19383932", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-surging-sparks-sleeved-booster-pack/19383932", "max_price": 10.00},
+
+    {"name": "Chaos Rising Elite Trainer Box (Mega Greninja ex)", "retailer": "bestbuy", "sku": "19893177", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-chaos-rising-elite-trainer-box-mega-greninja-ex/19893177", "max_price": 90.00},
+    {"name": "Chaos Rising 3-Pack Blister (Charmeleon)", "retailer": "bestbuy", "sku": "19893172", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-chaos-rising-3-pack-blister-charmeleon/19893172", "max_price": 30.00},
+    {"name": "Chaos Rising Booster Bundle", "retailer": "bestbuy", "sku": "19893174", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-chaos-rising-booster-bundle/19893174", "max_price": 60.00},
+    {"name": "Chaos Rising Booster Bundle", "retailer": "walmart", "url": "https://www.walmart.ca/en/ip/Pokemon-Trading-Card-Games-Mega-Evolution-Chaos-Rising-Booster-Bundle/6Z5CLX0MKJ39", "max_price": 60.00},
+    {"name": "Chaos Rising Booster Bundle", "retailer": "ebgames", "url": "https://www.ebgames.ca/Trading%20Cards/Games/965102/pokemon-trading-card-game-meega-evolution-chaos-rising-booster-bundle", "max_price": 60.00},
+
+    {"name": "Ascended Heroes Elite Trainer Box", "retailer": "bestbuy", "sku": "19775703", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-ascended-heroes-elite-trainer-box/19775703", "max_price": 90.00},
+    {"name": "Ascended Heroes Booster Bundle", "retailer": "bestbuy", "sku": "19865186", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-ascended-heroes-booster-bundle/19865186", "max_price": 60.00},
+    {"name": "Ascended Heroes 2-Pack Blister", "retailer": "bestbuy", "sku": "19824997", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-mega-evolution-2-5-ascended-heroes-2-pack-blister-only-1-random-pack/19824997", "max_price": 20.00},
+
+    {"name": "Phantasmal Flames Booster Box (36 packs)", "retailer": "bestbuy", "sku": "19604130", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-phantasmal-flames-booster-box-36-packs/19604130", "max_price": 360.00},
+    {"name": "Phantasmal Flames Sleeved Booster Pack", "retailer": "bestbuy", "sku": "19604132", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-phantasmal-flames-sleeved-booster-pack/19604132", "max_price": 10.00},
+
+    {"name": "Perfect Order Booster Box (36 packs)", "retailer": "bestbuy", "sku": "19826990", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-perfect-order-booster-box-36-packs/19826990", "max_price": 360.00},
+    {"name": "Perfect Order Booster Bundle", "retailer": "bestbuy", "sku": "19824977", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-perfect-order-booster-bundle/19824977", "max_price": 60.00}
   ]
 }
