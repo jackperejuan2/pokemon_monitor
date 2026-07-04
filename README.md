@@ -65,6 +65,36 @@ If Pokemon Center starts hard-blocking again later, repeat the same steps.
 This is a one-off manual unblock, not a permanent bypass — no CAPTCHA solving
 or bot-evasion arms race is built into the monitor by design.
 
+## Known issue: launchd cannot start the monitor yet (macOS Documents protection)
+
+The project lives under `~/Documents`, which macOS TCC-protects. Processes
+spawned by launchd don't inherit Terminal's Documents-folder access, so the
+service exits immediately with `PermissionError: ... pyvenv.cfg` and never
+starts. The plist is installed at `~/Library/LaunchAgents/com.pokemonmonitor.plist`
+but left **unloaded** until you do ONE of the following:
+
+**Option A (recommended, no security changes): move the project out of Documents.**
+
+    launchctl unload ~/Library/LaunchAgents/com.pokemonmonitor.plist 2>/dev/null
+    mv ~/Documents/"Pokemon Monitor" ~/pokemon-monitor
+    cd ~/pokemon-monitor
+    rm -rf .venv && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+    sed -i '' 's|/Users/northandunder/Documents/Pokemon Monitor|/Users/northandunder/pokemon-monitor|g' launchd/com.pokemonmonitor.plist
+    cp launchd/com.pokemonmonitor.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.pokemonmonitor.plist
+
+**Option B: grant Full Disk Access to the Python binary.** System Settings →
+Privacy & Security → Full Disk Access → `+` → add
+`/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3.9`,
+then `launchctl load ~/Library/LaunchAgents/com.pokemonmonitor.plist`.
+
+Either way, verify with `launchctl list | grep pokemonmonitor` (a real PID, not
+`-`) and `tail -5 logs/monitor.log`, and expect a "Monitor started." message in
+Discord.
+
+Until then you can always run it manually from a terminal:
+`.venv/bin/python monitor.py` (leave the window open).
+
 ## Operations
 
     .venv/bin/python monitor.py --check-once      # test every product now
