@@ -94,3 +94,38 @@ def test_in_stock_price_flake_keeps_last_known_price():
     assert rec.last_price == "80.00"
     assert changed is False
     assert rec.last_changed == NOW.isoformat()
+
+
+def test_records_roundtrip(tmp_path, monkeypatch):
+    import dashboard as d
+    monkeypatch.setattr(d, "DASHBOARD_PATH", tmp_path / "dashboard_data.json")
+    recs = {"bestbuy:1": d.DashboardRecord(last_price="80.00", last_status="in_stock",
+                                           lowest_price="80.00")}
+    d.save_records(recs)
+    assert d.load_records() == recs
+    assert not (tmp_path / "dashboard_data.json.tmp").exists()
+
+
+def test_load_records_missing_is_empty(tmp_path, monkeypatch):
+    import dashboard as d
+    monkeypatch.setattr(d, "DASHBOARD_PATH", tmp_path / "nope.json")
+    assert d.load_records() == {}
+
+
+def test_load_records_corrupt_is_empty(tmp_path, monkeypatch):
+    import dashboard as d
+    p = tmp_path / "dashboard_data.json"
+    p.write_text("{not json")
+    monkeypatch.setattr(d, "DASHBOARD_PATH", p)
+    assert d.load_records() == {}
+
+
+def test_load_records_tolerates_unknown_keys(tmp_path, monkeypatch):
+    import json
+    import dashboard as d
+    p = tmp_path / "dashboard_data.json"
+    p.write_text(json.dumps({"bestbuy:1": {"last_price": "80.00", "last_status": "in_stock",
+                                           "future_field": 1}}))
+    monkeypatch.setattr(d, "DASHBOARD_PATH", p)
+    loaded = d.load_records()
+    assert loaded["bestbuy:1"].last_price == "80.00"

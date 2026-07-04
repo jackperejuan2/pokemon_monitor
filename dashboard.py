@@ -6,11 +6,18 @@ notifications. update_record and render_html are pure.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+import logging
+import os
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 
 from adapters.base import Status, StockResult
+
+log = logging.getLogger("dashboard")
+DASHBOARD_PATH = Path(__file__).parent / "dashboard_data.json"
 
 
 @dataclass
@@ -73,3 +80,24 @@ def update_record(prev: DashboardRecord, result: StockResult, now: datetime):
         ),
         changed,
     )
+
+
+def load_records() -> dict[str, DashboardRecord]:
+    if not DASHBOARD_PATH.exists():
+        return {}
+    try:
+        raw = json.loads(DASHBOARD_PATH.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        log.warning("could not read %s (%s); starting fresh", DASHBOARD_PATH, exc)
+        return {}
+    fields = DashboardRecord.__dataclass_fields__
+    return {
+        key: DashboardRecord(**{k: v for k, v in value.items() if k in fields})
+        for key, value in raw.items()
+    }
+
+
+def save_records(records: dict[str, DashboardRecord]) -> None:
+    tmp = DASHBOARD_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps({k: asdict(v) for k, v in records.items()}, indent=2))
+    os.replace(tmp, DASHBOARD_PATH)
