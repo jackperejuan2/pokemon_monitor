@@ -100,7 +100,14 @@ class JsonLdAdapter:
         return parse_stock_from_html(response.text, product.url)
 
     async def _check_via_browser(self, product: Product) -> StockResult:
-        fallback_html = await fetch_page_html(product.url, profile=f"{product.retailer}-profile")
+        # Real-Chrome NEW-HEADLESS still gets blocked by PerimeterX-style bot
+        # walls (see experiment matrix, 2026-07-04, for Walmart which shares
+        # the same PerimeterX-family protection as EB Games). Use a headed
+        # real Chrome window instead -- bundled headless Chromium is blocked
+        # outright, and real-Chrome headless is also detected.
+        fallback_html = await fetch_page_html(
+            product.url, profile=f"{product.retailer}-profile", headless=False, channel="chrome"
+        )
         if is_challenge_page(fallback_html):
             raise Blocked(f"{product.retailer} served a challenge page")
         return parse_stock_from_html(fallback_html, product.url)

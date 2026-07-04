@@ -122,6 +122,14 @@ def test_looks_blocked_is_false_for_normal_product_page():
     assert not looks_blocked("https://www.walmart.ca/en/ip/Pokemon-ETB/6Z5CLX0MKJ39")
 
 
+def test_looks_blocked_detects_bare_forbidden_body():
+    assert looks_blocked("<html><body>Forbidden</body></html>")
+
+
+def test_looks_blocked_detects_bare_access_denied_body():
+    assert looks_blocked("<html><body>Access Denied</body></html>")
+
+
 def test_reversed_script_attribute_order_parses():
     product = {
         "name": "Pokemon ETB",

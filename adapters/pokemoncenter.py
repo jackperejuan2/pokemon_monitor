@@ -33,12 +33,19 @@ class PokemonCenterAdapter:
 
     async def check(self, client: httpx.AsyncClient, product: Product) -> StockResult:
         # `client` is unused: Pokemon Center blocks plain HTTP.
+        #
+        # Empirically (see experiment matrix, 2026-07-04): real-Chrome
+        # NEW-HEADLESS (channel="chrome", headless=True) still gets served an
+        # Incapsula challenge iframe. Only a headed real Chrome window passes,
+        # so this intentionally opens a visible Chrome window.
         html = await fetch_page_html_with_challenge_retry(
             product.url,
             profile=PROFILE_NAME,
             is_challenge=is_challenge_page,
             retries=2,
             retry_wait_ms=10_000,
+            headless=False,
+            channel="chrome",
         )
         if is_challenge_page(html):
             raise Blocked("pokemoncenter served a challenge page")

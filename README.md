@@ -35,35 +35,33 @@ retailers default to a longer check interval via `interval_overrides` in
 `config.json` (600–900s, vs. 120–300s for plain-HTTP retailers). You'll see a
 Chromium window pop up periodically for these — that's expected, not a bug.
 
-## Known issue: Pokemon Center is currently hard-blocked
+## Browser retailers require a VISIBLE Chrome window
 
-As of this writing, Pokemon Center serves an Imperva/Incapsula "incident"
-challenge page to the monitor's browser profile on every check, so it will
-show `ERROR: pokemoncenter served a challenge page` and never report real
-stock status. Imperva tracks trust per browser profile, and the monitor's
-profile hasn't built up any "looks human" history yet.
+Walmart, EB Games, and Pokemon Center block plain HTTP and headless browsers
+(PerimeterX / Imperva). The only mode that gets through is **real Google Chrome
+in a headed (visible) window** — the monitor launches `channel="chrome"`,
+`headless=False` for these three retailers. Empirically confirmed 2026-07-04:
+new-headless real Chrome is blocked by both walls; only a visible window works.
 
-**Fix:** clear the block by browsing pokemoncenter.com manually, once, using
-the *same* browser profile the monitor uses (`~/.pokemon-monitor/pc-profile`).
+Consequences:
+- Each Walmart / EB Games / Pokemon Center check opens a Chrome window for
+  ~20 seconds, then closes it. Best Buy uses a fast JSON API and never opens a
+  window.
+- These three retailers are throttled to 30–60 min between checks
+  (`interval_overrides` in `config.json`) to keep windows occasional.
+- The monitor needs a real logged-in macOS session with a display — it cannot
+  run "truly headless" on a server for these retailers. For windowless 24/7
+  operation, run it in a separate macOS user account (fast-user-switch away) or
+  on a spare Mac.
+- Google Chrome must be installed (`/Applications/Google Chrome.app`).
 
-1. Quit the monitor first if it's running, so nothing else is using that
-   profile at the same time:
+If Pokemon Center ever starts returning `challenge page` errors again (Imperva
+can escalate), browse pokemoncenter.com once in the monitor's own profile to
+rebuild trust, then let it resume:
 
-       launchctl unload ~/Library/LaunchAgents/com.pokemonmonitor.plist
+    .venv/bin/python -m playwright open --channel chrome --user-data-dir ~/.pokemon-monitor/pc-profile https://www.pokemoncenter.com/en-ca
 
-2. Open a real Chromium window on that profile and browse around normally
-   (view the product page, scroll, maybe check another page) until the
-   incident page stops appearing:
-
-       .venv/bin/python -m playwright open --user-data-dir ~/.pokemon-monitor/pc-profile https://www.pokemoncenter.com/en-ca
-
-3. Close that window once pages load normally, then restart the monitor:
-
-       launchctl load ~/Library/LaunchAgents/com.pokemonmonitor.plist
-
-If Pokemon Center starts hard-blocking again later, repeat the same steps.
-This is a one-off manual unblock, not a permanent bypass — no CAPTCHA solving
-or bot-evasion arms race is built into the monitor by design.
+No CAPTCHA solving or fingerprint spoofing is built in, by design.
 
 ## Known issue: launchd cannot start the monitor yet (macOS Documents protection)
 
