@@ -12,6 +12,7 @@ import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
+from html import escape
 from pathlib import Path
 
 from adapters.base import Status, StockResult
@@ -101,3 +102,80 @@ def save_records(records: dict[str, DashboardRecord]) -> None:
     tmp = DASHBOARD_PATH.with_suffix(".json.tmp")
     tmp.write_text(json.dumps({k: asdict(v) for k, v in records.items()}, indent=2))
     os.replace(tmp, DASHBOARD_PATH)
+
+
+_PAGE_CSS = """
+body{font-family:-apple-system,system-ui,sans-serif;background:#15171c;color:#e6e6e6;
+  margin:0;padding:24px;max-width:1100px;margin:0 auto}
+h1{font-size:20px} .meta{opacity:.65;font-size:13px;margin-bottom:22px}
+.setblock{margin-bottom:24px;border:1px solid rgba(255,255,255,.12);border-radius:10px;overflow:hidden}
+.sethead{padding:10px 14px;background:rgba(255,255,255,.06);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:7px 12px;font-size:11px;opacity:.55;text-transform:uppercase}
+td{padding:9px 12px;border-top:1px solid rgba(255,255,255,.07)}
+tr.buy td{background:rgba(46,204,113,.14)}
+.pill{font-size:11px;padding:2px 7px;border-radius:20px}
+.in{background:rgba(46,204,113,.22);color:#7ee2a8}.out{background:rgba(255,255,255,.09);opacity:.6}
+.good{color:#7ee2a8;font-weight:600}.bad{color:#e8a0a0;font-weight:600}
+.muted{opacity:.45}a{color:#6db3f2;text-decoration:none}
+"""
+
+
+def _per_pack(price: Decimal, packs: int) -> str:
+    if packs <= 0:
+        return '<span class="muted">&mdash;</span>'
+    per = price / packs
+    cls = "good" if per <= 10 else "bad"
+    return f'<span class="{cls}">${per:.2f}</span>'
+
+
+def _row(product, rec: DashboardRecord) -> str:
+    status = rec.last_status
+    pill = ('<span class="pill in">in stock</span>' if status == "in_stock"
+            else f'<span class="pill out">{escape(status.replace("_", " "))}</span>')
+    price = None if rec.last_price is None else Decimal(rec.last_price)
+    is_buy = price is not None and price <= product.max_price
+    cur = f"${price:.2f}" if price is not None else '<span class="muted">&mdash;</span>'
+    perpack = _per_pack(price, product.packs) if price is not None else '<span class="muted">&mdash;</span>'
+    lowest = f"${Decimal(rec.lowest_price):.2f}" if rec.lowest_price else '<span class="muted">&mdash;</span>'
+    tr = ' class="buy"' if is_buy else ""
+    return (
+        f"<tr{tr}><td>{escape(product.name)}</td>"
+        f'<td class="muted">{escape(product.retailer)}</td>'
+        f"<td>{pill}</td><td>{cur}</td><td>{perpack}</td>"
+        f'<td class="muted">{lowest}</td>'
+        f'<td><a href="{escape(product.url)}">open &#8599;</a></td></tr>'
+    )
+
+
+def render_html(products, records, now: datetime, healthy: bool) -> str:
+    # Preserve first-seen set order from the watchlist.
+    order = []
+    grouped: dict[str, list] = {}
+    for p in products:
+        if p.set_name not in grouped:
+            grouped[p.set_name] = []
+            order.append(p.set_name)
+        grouped[p.set_name].append(p)
+
+    blocks = []
+    for set_name in order:
+        rows = "".join(_row(p, records.get(p.key, DashboardRecord())) for p in grouped[set_name])
+        blocks.append(
+            f'<div class="setblock"><div class="sethead">{escape(set_name)}</div>'
+            "<table><tr><th>Variant</th><th>Retailer</th><th>Status</th><th>Current</th>"
+            "<th>$/pack</th><th>Lowest ever</th><th></th></tr>"
+            f"{rows}</table></div>"
+        )
+
+    health = "healthy &#9989;" if healthy else "degraded &#9888;"
+    return (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Pokemon Restock Monitor</title>"
+        f"<style>{_PAGE_CSS}</style></head><body>"
+        "<h1>&#127918; Pokemon Restock Monitor</h1>"
+        f'<div class="meta">{len(products)} products &middot; {len(order)} sets '
+        f"&nbsp;|&nbsp; updated {escape(now.strftime('%Y-%m-%d %H:%M'))} &nbsp;|&nbsp; {health}</div>"
+        f"{''.join(blocks)}</body></html>"
+    )

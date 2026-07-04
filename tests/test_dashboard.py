@@ -129,3 +129,53 @@ def test_load_records_tolerates_unknown_keys(tmp_path, monkeypatch):
     monkeypatch.setattr(d, "DASHBOARD_PATH", p)
     loaded = d.load_records()
     assert loaded["bestbuy:1"].last_price == "80.00"
+
+
+def _product(name, retailer, set_name, packs, max_price, url="https://x/p", sku=None):
+    from decimal import Decimal
+    from adapters.base import Product
+    return Product(name=name, retailer=retailer, url=url, max_price=Decimal(str(max_price)),
+                   sku=sku, packs=packs, set_name=set_name)
+
+
+def test_render_groups_by_set_and_flags_buys():
+    from datetime import datetime
+    import dashboard as d
+    products = [
+        _product("Perfect Order Booster Box", "bestbuy", "Perfect Order", 36, 360),
+        _product("Chaos Rising Booster Bundle", "bestbuy", "Chaos Rising", 6, 60,
+                 url="https://x/chaos"),
+    ]
+    records = {
+        products[0].key: d.DashboardRecord(last_price="344.99", last_status="in_stock",
+                                           lowest_price="344.99"),
+        products[1].key: d.DashboardRecord(last_price="103.99", last_status="in_stock",
+                                           lowest_price="49.98"),
+    }
+    html = d.render_html(products, records, datetime(2026, 7, 4, 12, 0, 0), healthy=True)
+    assert "<!DOCTYPE html>" in html
+    assert "Perfect Order" in html and "Chaos Rising" in html
+    assert 'class="buy"' in html
+    assert "$9.58" in html
+    assert "$17.33" in html
+    assert "https://x/chaos" in html
+
+
+def test_render_missing_price_shows_dash():
+    from datetime import datetime
+    import dashboard as d
+    products = [_product("A Single", "bestbuy", "151", 1, 10)]
+    records = {products[0].key: d.DashboardRecord(last_price=None, last_status="out_of_stock",
+                                                  lowest_price="9.99")}
+    html = d.render_html(products, records, datetime(2026, 7, 4, 12, 0, 0), healthy=True)
+    assert "out of stock" in html.lower()
+    assert "&mdash;" in html or "—" in html
+    assert "$9.99" in html
+
+
+def test_render_product_with_no_record_is_safe():
+    from datetime import datetime
+    import dashboard as d
+    products = [_product("New Item", "bestbuy", "151", 9, 90)]
+    html = d.render_html(products, {}, datetime(2026, 7, 4, 12, 0, 0), healthy=True)
+    assert "New Item" in html
