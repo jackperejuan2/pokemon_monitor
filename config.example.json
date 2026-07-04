@@ -3,9 +3,9 @@
   "check_interval_seconds": [120, 300],
   "pokemoncenter_interval_seconds": [600, 900],
   "interval_overrides": {
-    "pokemoncenter": [600, 900],
-    "walmart": [600, 900],
-    "ebgames": [600, 900]
+    "pokemoncenter": [1800, 3600],
+    "walmart": [1800, 3600],
+    "ebgames": [1800, 3600]
   },
   "quiet_hours": {"start": "01:30", "end": "07:00"},
   "heartbeat_hour": 9
