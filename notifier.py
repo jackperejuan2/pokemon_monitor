@@ -21,19 +21,19 @@ def build_restock_embed(product: Product, result: StockResult) -> dict:
         "url": product.url,
         "color": COLOR_RESTOCK,
         "description": (
-            f"**${result.price} CAD** (max ${product.max_price}) at **{product.retailer}**\n"
+            f"**${result.price:.2f} CAD** (max ${product.max_price:.2f}) at **{product.retailer}**\n"
             f"[Buy now]({product.url})"
         ),
     }
 
 
 def build_over_price_embed(product: Product, result: StockResult) -> dict:
-    price_text = f"${result.price} CAD" if result.price is not None else "price unknown"
+    price_text = f"${result.price:.2f} CAD" if result.price is not None else "price unknown"
     return {
         "title": f"🟡 In stock over max: {product.name}",
         "url": product.url,
         "color": COLOR_OVER_PRICE,
-        "description": f"{price_text} (max ${product.max_price}) at {product.retailer}",
+        "description": f"{price_text} (max ${product.max_price:.2f}) at {product.retailer}",
     }
 
 

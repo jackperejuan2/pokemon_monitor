@@ -170,6 +170,9 @@ async def process_product(client, notifier, product, states, health):
     h.record_success()
     prev = states.get(product.key, ProductState())
     decision = decide(prev, result, product, datetime.now())
+    # State is recorded before the alert is sent: at-most-once delivery. If
+    # Discord fails all of Notifier.send's retries, this restock alert is lost
+    # until the product cycles out of stock and back.
     states[product.key] = decision.new_state
     try:
         save_state(states)
@@ -209,16 +212,18 @@ async def run():
             products = safe_reload(load_watchlist, products, "watchlist.json")
             now = datetime.now()
 
-            if in_quiet_hours(now, config):
-                await asyncio.sleep(60)
-                continue
-
+            # Heartbeat runs before the quiet-hours gate so "silence = failure"
+            # holds even when quiet hours cover the heartbeat hour.
             heartbeat_hour = config.get("heartbeat_hour", 9)
             if now.hour >= heartbeat_hour and last_heartbeat_date != now.date():
                 last_heartbeat_date = now.date()
                 await notifier.send(
                     build_heartbeat_embed(len(products), unhealthy_retailers(health))
                 )
+
+            if in_quiet_hours(now, config):
+                await asyncio.sleep(60)
+                continue
 
             for product in products:
                 if now < next_check.get(product.key, now):
