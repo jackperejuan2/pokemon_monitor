@@ -7,13 +7,17 @@ from playwright.async_api import async_playwright
 
 PROFILE_ROOT = Path.home() / ".pokemon-monitor"
 
+# Markers must be specific to actual block/challenge pages. A bare "captcha"
+# substring was too broad: real Pokemon Center product pages embed a legitimate
+# i18n string ("reCaptchaError": "We encountered an issue with the page...") as
+# normal content, which a raw match flagged as a challenge. Rely on
+# Imperva/Cloudflare-specific markers instead of generic tokens like "captcha".
 CHALLENGE_MARKERS = (
     "access denied",
     "_incapsula_",
     "pardon our interruption",
-    "captcha",
-    "cf-challenge",
     "just a moment",
+    "cf-challenge",
 )
 
 # One browser at a time: persistent Chromium profiles are locked per user-data-dir,

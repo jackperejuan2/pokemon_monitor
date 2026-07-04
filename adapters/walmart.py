@@ -14,7 +14,13 @@ NEXT_DATA_RE = re.compile(
     re.DOTALL,
 )
 
-BLOCKED_MARKERS = ("/blocked", "px-captcha", "robot or human")
+BLOCKED_MARKERS = (
+    "/blocked",
+    "px-captcha",
+    "robot or human",
+    "forbidden",
+    "access denied",
+)
 
 PROFILE_NAME = "walmart-profile"
 
@@ -74,7 +80,15 @@ class WalmartAdapter:
 
         # httpx path was blocked (403/429, or a PerimeterX /blocked redirect,
         # or a px-captcha interstitial) -- fall back to a real browser.
-        fallback_html = await fetch_page_html(product.url, profile=PROFILE_NAME, headless=True)
+        #
+        # Empirically (see experiment matrix, 2026-07-04): real-Chrome
+        # NEW-HEADLESS (channel="chrome", headless=True) is still detected and
+        # blocked by PerimeterX (bare "Forbidden" body). Only a headed real
+        # Chrome window passes. Bundled headless Chromium is blocked outright.
+        # So this intentionally opens a visible Chrome window.
+        fallback_html = await fetch_page_html(
+            product.url, profile=PROFILE_NAME, headless=False, channel="chrome"
+        )
         if looks_blocked(fallback_html):
             raise Blocked("walmart blocked both http and browser")
         return parse_next_data(fallback_html, product.url)

@@ -35,6 +35,37 @@ def test_normal_page_is_not_challenge():
     assert not is_challenge_page("<html><body>Pokemon TCG: Add to Cart $64.99</body></html>")
 
 
+# Live testing (2026-07-04) found this legitimate i18n string embedded in real
+# Pokemon Center product pages. A bare "captcha" substring match flagged it as a
+# challenge even though the product title/price/availability parsed fine.
+POKEMONCENTER_RECAPTCHA_ERROR_STRING = (
+    '<html><body>'
+    '<script>window.__NEXT_DATA__ = {"props":{"messages":{'
+    '"reCaptchaError":"We encountered an issue with the page you have requested. '
+    'This could be a browser issue or a temporary problem."}}}</script>'
+    'Pokemon TCG: Chaos Rising Booster Bundle - Add to Cart $64.99'
+    '</body></html>'
+)
+
+
+def test_real_recaptcha_error_i18n_string_is_not_challenge():
+    # Regression: the embedded "reCaptchaError" i18n string is normal page
+    # content, not an actual CAPTCHA challenge, and must not be flagged.
+    assert not is_challenge_page(POKEMONCENTER_RECAPTCHA_ERROR_STRING)
+    assert not browser_module_is_challenge_page(POKEMONCENTER_RECAPTCHA_ERROR_STRING)
+
+
+def test_imperva_access_denied_incident_snippet_is_challenge():
+    # Real Imperva/Incapsula block page body.
+    html = "Access denied Error 15 ... Incident ID"
+    assert is_challenge_page(html)
+
+
+def test_imperva_incapsula_resource_snippet_is_challenge():
+    html = "some page containing _Incapsula_Resource somewhere in the body"
+    assert is_challenge_page(html)
+
+
 def test_concurrent_checks_serialize_on_browser_lock():
     order = []
 
