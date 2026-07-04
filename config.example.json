@@ -2,6 +2,11 @@
   "discord_webhook_url": "https://discord.com/api/webhooks/CHANGE_ME",
   "check_interval_seconds": [120, 300],
   "pokemoncenter_interval_seconds": [600, 900],
+  "interval_overrides": {
+    "pokemoncenter": [600, 900],
+    "walmart": [600, 900],
+    "ebgames": [600, 900]
+  },
   "quiet_hours": {"start": "01:30", "end": "07:00"},
   "heartbeat_hour": 9
 }

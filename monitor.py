@@ -109,20 +109,42 @@ def in_quiet_hours(now: datetime, config: dict) -> bool:
     return current >= start or current < end  # wraps midnight
 
 
-def check_interval(product: Product, config: dict, health: RetailerHealth) -> float:
-    key = (
-        "pokemoncenter_interval_seconds"
-        if product.retailer == "pokemoncenter"
-        else "check_interval_seconds"
-    )
-    raw = config.get(key, [120, 300])
+def _parse_interval_range(raw, label: str) -> tuple[float, float] | None:
+    """Returns (low, high) if `raw` is a valid 2-element numeric range, else
+    None (caller should fall through to the next config tier)."""
     try:
         if not isinstance(raw, (list, tuple)) or len(raw) != 2:
             raise ValueError("expected a 2-element list")
-        low, high = float(raw[0]), float(raw[1])
+        return float(raw[0]), float(raw[1])
     except (TypeError, ValueError, IndexError, KeyError):
-        log.warning("bad %s in config (%r); using [120, 300]", key, raw)
-        low, high = 120.0, 300.0
+        log.warning("bad %s in config (%r); falling back", label, raw)
+        return None
+
+
+def check_interval(product: Product, config: dict, health: RetailerHealth) -> float:
+    low_high = None
+
+    overrides = config.get("interval_overrides")
+    if isinstance(overrides, dict) and product.retailer in overrides:
+        low_high = _parse_interval_range(
+            overrides[product.retailer], f"interval_overrides.{product.retailer}"
+        )
+
+    if low_high is None and product.retailer == "pokemoncenter":
+        if "pokemoncenter_interval_seconds" in config:
+            low_high = _parse_interval_range(
+                config["pokemoncenter_interval_seconds"], "pokemoncenter_interval_seconds"
+            )
+
+    if low_high is None and "check_interval_seconds" in config:
+        low_high = _parse_interval_range(
+            config["check_interval_seconds"], "check_interval_seconds"
+        )
+
+    if low_high is None:
+        low_high = (120.0, 300.0)
+
+    low, high = low_high
     return random.uniform(low, high) * health.backoff
 
 
