@@ -6,12 +6,25 @@ from decimal import Decimal, InvalidOperation
 
 import httpx
 
-from .base import Product, Status, StockResult, raise_if_blocked
+from .base import Blocked, Product, Status, StockResult, raise_if_blocked
+from .browser import fetch_page_html
 
 NEXT_DATA_RE = re.compile(
     r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>',
     re.DOTALL,
 )
+
+BLOCKED_MARKERS = ("/blocked", "px-captcha", "robot or human")
+
+PROFILE_NAME = "walmart-profile"
+
+
+def looks_blocked(html_or_url: str) -> bool:
+    """True if the given response body or URL looks like a PerimeterX block
+    page (walmart.ca redirects to /blocked, or serves a px-captcha /
+    "Robot or human" interstitial)."""
+    lowered = html_or_url.lower()
+    return any(marker in lowered for marker in BLOCKED_MARKERS)
 
 
 def parse_next_data(html: str, url: str = "") -> StockResult:
@@ -50,7 +63,18 @@ def parse_next_data(html: str, url: str = "") -> StockResult:
 
 class WalmartAdapter:
     async def check(self, client: httpx.AsyncClient, product: Product) -> StockResult:
-        response = await client.get(product.url)
-        raise_if_blocked(response)
-        response.raise_for_status()
-        return parse_next_data(response.text, product.url)
+        try:
+            response = await client.get(product.url)
+            raise_if_blocked(response)
+            response.raise_for_status()
+            if not looks_blocked(str(response.url)) and not looks_blocked(response.text):
+                return parse_next_data(response.text, product.url)
+        except Blocked:
+            pass
+
+        # httpx path was blocked (403/429, or a PerimeterX /blocked redirect,
+        # or a px-captcha interstitial) -- fall back to a real browser.
+        fallback_html = await fetch_page_html(product.url, profile=PROFILE_NAME)
+        if looks_blocked(fallback_html):
+            raise Blocked("walmart blocked both http and browser")
+        return parse_next_data(fallback_html, product.url)
