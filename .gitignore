@@ -4,3 +4,5 @@ __pycache__/
 state.json
 config.json
 logs/
+.superpowers/
+dashboard_data.json

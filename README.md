@@ -15,8 +15,36 @@ Edit `watchlist.json` — the monitor hot-reloads it, no restart needed:
                                      // ebgames | costco | pokemoncenter
       "sku": "17095567",            // required for bestbuy, optional otherwise
       "url": "https://www.bestbuy.ca/en-ca/product/17095567",
-      "max_price": 64.99
+      "max_price": 64.99,
+      "packs": 9,
+      "set": "Prismatic Evolutions"
     }
+
+## Web dashboard
+
+The monitor publishes a live web page listing every watched product with its
+current price, all-time-low price, cost per pack, stock status, and a link out —
+grouped by set. It updates whenever a price or stock status changes (and once a
+day on the heartbeat).
+
+**One-time setup:**
+
+    bash scripts/setup-pages.sh
+
+This creates a `gh-pages` branch, a worktree at `~/.pokemon-monitor/pages`, and
+enables GitHub Pages. The page appears at
+`https://jackperejuan2.github.io/pokemon_monitor/`.
+
+**How it works:** after each check the monitor updates `dashboard_data.json`
+(local, gitignored) and, when something changed, renders a self-contained
+`index.html` and force-pushes it to the `gh-pages` branch (a single rolling
+commit — `main` history is never touched). GitHub Pages serves it. Publishing
+failures are logged and never interrupt checks or alerts. The page is public and
+contains only product display data — no secrets (the Discord webhook stays in
+gitignored `config.json`).
+
+Each watchlist entry needs `"packs"` (pack count, for cost-per-pack) and `"set"`
+(for grouping) — see existing entries for the format.
 
 ## Browser-fallback retailers
 
