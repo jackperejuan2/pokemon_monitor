@@ -81,6 +81,9 @@ def test_check_interval_bad_shape_falls_back():
     assert 120 <= check_interval(product("bestbuy"), bad, h) <= 300
     bad2 = {"check_interval_seconds": ["x", "y"]}
     assert 120 <= check_interval(product("bestbuy"), bad2, h) <= 300
+    bad3 = {"check_interval_seconds": [100, 200, 300]}
+    for _ in range(50):
+        assert 120 <= check_interval(product("bestbuy"), bad3, h) <= 300
 
 
 def test_quiet_hours_malformed_fails_open():

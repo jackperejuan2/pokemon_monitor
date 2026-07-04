@@ -117,6 +117,8 @@ def check_interval(product: Product, config: dict, health: RetailerHealth) -> fl
     )
     raw = config.get(key, [120, 300])
     try:
+        if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+            raise ValueError("expected a 2-element list")
         low, high = float(raw[0]), float(raw[1])
     except (TypeError, ValueError, IndexError, KeyError):
         log.warning("bad %s in config (%r); using [120, 300]", key, raw)
