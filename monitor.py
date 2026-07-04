@@ -27,6 +27,8 @@ from notifier import (
     build_restock_embed,
     build_system_embed,
 )
+from dashboard import DashboardRecord, load_records, render_html, save_records, update_record
+from publisher import publish, should_publish
 from state import ProductState, decide, load_state, save_state
 
 BASE_DIR = Path(__file__).parent
@@ -150,7 +152,7 @@ def check_interval(product: Product, config: dict, health: RetailerHealth) -> fl
     return random.uniform(low, high) * health.backoff
 
 
-async def process_product(client, notifier, product, states, health):
+async def process_product(client, notifier, product, states, records, health) -> bool:
     h = health[product.retailer]
     try:
         result = await ADAPTERS[product.retailer].check(client, product)
@@ -160,32 +162,39 @@ async def process_product(client, notifier, product, states, health):
             await notifier.send(
                 build_system_embed(f"**{product.retailer}** is blocking checks ({exc}). Backing off.")
             )
-        return
+        return False
     except Exception as exc:
         log.exception("%s check failed for %s", product.retailer, product.name)
         if h.record_error():
             await notifier.send(
                 build_system_embed(f"**{product.retailer}** has failed 5 checks in a row: {exc}")
             )
-        return
+        return False
 
     h.record_success()
+    now = datetime.now()
     prev = states.get(product.key, ProductState())
-    decision = decide(prev, result, product, datetime.now())
-    # State is recorded before the alert is sent: at-most-once delivery. If
-    # Discord fails all of Notifier.send's retries, this restock alert is lost
-    # until the product cycles out of stock and back.
+    decision = decide(prev, result, product, now)
     states[product.key] = decision.new_state
     try:
         save_state(states)
     except Exception:
         log.exception("could not persist state")
+
+    new_rec, changed = update_record(records.get(product.key, DashboardRecord()), result, now)
+    records[product.key] = new_rec
+    try:
+        save_records(records)
+    except Exception:
+        log.exception("could not persist dashboard records")
+
     log.info("%s %s -> %s price=%s alert=%s",
              product.retailer, product.name, result.status.value, result.price, decision.alert)
     if decision.alert == "restock":
         await notifier.send(build_restock_embed(product, result))
     elif decision.alert == "over_price":
         await notifier.send(build_over_price_embed(product, result))
+    return changed
 
 
 def unhealthy_retailers(health):
@@ -199,6 +208,7 @@ async def run():
     config = load_config()
     notifier = Notifier(config["discord_webhook_url"])
     states = load_state()
+    records = load_records()
     health = defaultdict(RetailerHealth)
     next_check = {}
     last_heartbeat_date = None
@@ -214,11 +224,11 @@ async def run():
             products = safe_reload(load_watchlist, products, "watchlist.json")
             now = datetime.now()
 
-            # Heartbeat runs before the quiet-hours gate so "silence = failure"
-            # holds even when quiet hours cover the heartbeat hour.
+            is_heartbeat = False
             heartbeat_hour = config.get("heartbeat_hour", 9)
             if now.hour >= heartbeat_hour and last_heartbeat_date != now.date():
                 last_heartbeat_date = now.date()
+                is_heartbeat = True
                 await notifier.send(
                     build_heartbeat_embed(len(products), unhealthy_retailers(health))
                 )
@@ -227,14 +237,16 @@ async def run():
                 await asyncio.sleep(60)
                 continue
 
+            dirty = False
             for product in products:
                 if now < next_check.get(product.key, now):
                     continue
                 try:
-                    await asyncio.wait_for(
-                        process_product(client, notifier, product, states, health),
+                    changed = await asyncio.wait_for(
+                        process_product(client, notifier, product, states, records, health),
                         timeout=180,
                     )
+                    dirty = dirty or bool(changed)
                 except asyncio.TimeoutError:
                     log.warning("check timed out for %s", product.key)
                 next_check[product.key] = datetime.now() + timedelta(
@@ -242,6 +254,11 @@ async def run():
                 )
                 await asyncio.sleep(random.uniform(2, 8))  # spread checks out
                 now = datetime.now()
+
+            if should_publish(dirty, is_heartbeat):
+                html = render_html(products, records, datetime.now(),
+                                   healthy=not unhealthy_retailers(health))
+                publish(html)
 
             await asyncio.sleep(5)
 

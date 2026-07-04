@@ -131,14 +131,16 @@ def test_process_product_survives_state_save_failure(monkeypatch):
 
     monkeypatch.setitem(ADAPTERS, "faketailer", FakeAdapter())
     monkeypatch.setattr(monitor, "save_state", boom)
+    monkeypatch.setattr(monitor, "save_records", lambda r: None)
 
     notifier = FakeNotifier()
     states = {}
+    records = {}
     health = defaultdict(RetailerHealth)
     prod = product("faketailer")
     # Must not raise, state must still be updated in memory, and the
     # restock alert must still be sent even though persistence failed.
-    asyncio.run(monitor.process_product(None, notifier, prod, states, health))
+    asyncio.run(monitor.process_product(None, notifier, prod, states, records, health))
     assert states[prod.key].price_ok is True
     assert any("RESTOCK" in embed.get("title", "") for embed in notifier.sent)
 
@@ -203,6 +205,37 @@ def test_interval_overrides_ignored_for_unlisted_retailer():
     }
     for _ in range(50):
         assert 120 <= check_interval(product("bestbuy"), config, h) <= 300
+
+
+def test_process_product_updates_records_and_reports_change(monkeypatch):
+    import asyncio
+    from decimal import Decimal
+    import monitor
+    from adapters import ADAPTERS
+    from adapters.base import Product, Status, StockResult
+
+    product = Product(name="X", retailer="faketest", url="https://x", max_price=Decimal("90"),
+                      packs=9, set_name="151")
+
+    class FakeAdapter:
+        async def check(self, client, prod):
+            return StockResult(status=Status.IN_STOCK, price=Decimal("50.00"), title="X",
+                               url=prod.url)
+
+    monkeypatch.setitem(ADAPTERS, "faketest", FakeAdapter())
+    monkeypatch.setattr(monitor, "save_state", lambda s: None)
+    monkeypatch.setattr(monitor, "save_records", lambda r: None)
+
+    class NullNotifier:
+        async def send(self, embed):
+            pass
+
+    states, records, health = {}, {}, __import__("collections").defaultdict(monitor.RetailerHealth)
+    changed = asyncio.run(
+        monitor.process_product(None, NullNotifier(), product, states, records, health)
+    )
+    assert changed is True
+    assert records[product.key].last_price == "50.00"
 
 
 def test_load_watchlist_reads_packs_and_set(tmp_path, monkeypatch):
