@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from decimal import Decimal
 
@@ -72,3 +73,32 @@ def test_success_resets_health():
     assert h.backoff == 1.0
     assert h.consecutive_errors == 0
     assert h.record_blocked() is True  # warning re-armed after recovery
+
+
+def test_check_interval_bad_shape_falls_back():
+    h = RetailerHealth()
+    bad = {"check_interval_seconds": 200}
+    assert 120 <= check_interval(product("bestbuy"), bad, h) <= 300
+    bad2 = {"check_interval_seconds": ["x", "y"]}
+    assert 120 <= check_interval(product("bestbuy"), bad2, h) <= 300
+
+
+def test_quiet_hours_malformed_fails_open():
+    from monitor import in_quiet_hours
+    assert not in_quiet_hours(datetime(2026, 7, 3, 3, 0), {"quiet_hours": {"start": "25:99", "end": "07:00"}})
+    assert not in_quiet_hours(datetime(2026, 7, 3, 3, 0), {"quiet_hours": {"start": "01:00"}})
+
+
+def test_safe_reload_keeps_previous_on_error():
+    from monitor import safe_reload
+
+    def boom():
+        raise json.JSONDecodeError("bad", "doc", 0)
+
+    previous = ["sentinel"]
+    assert safe_reload(boom, previous, "watchlist.json") is previous
+
+    def ok():
+        return ["fresh"]
+
+    assert safe_reload(ok, previous, "watchlist.json") == ["fresh"]
