@@ -1,0 +1,29 @@
+{
+  "products": [
+    {
+      "name": "Mega Evolution Chaos Rising Booster Bundle",
+      "retailer": "bestbuy",
+      "sku": "19893174",
+      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-chaos-rising-booster-bundle/19893174",
+      "max_price": 34.99
+    },
+    {
+      "name": "Mega Evolution Chaos Rising Booster Bundle",
+      "retailer": "pokemoncenter",
+      "url": "https://www.pokemoncenter.com/en-ca/product/10-10403-109/pokemon-tcg-mega-evolution-chaos-rising-booster-bundle",
+      "max_price": 34.99
+    },
+    {
+      "name": "Mega Evolution Chaos Rising Booster Bundle",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-Trading-Card-Games-Mega-Evolution-Chaos-Rising-Booster-Bundle/6Z5CLX0MKJ39",
+      "max_price": 34.99
+    },
+    {
+      "name": "Mega Evolution Chaos Rising Booster Bundle",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/965102/pokemon-trading-card-game-meega-evolution-chaos-rising-booster-bundle",
+      "max_price": 34.99
+    }
+  ]
+}

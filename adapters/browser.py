@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+
+from playwright.async_api import async_playwright
+
+PROFILE_ROOT = Path.home() / ".pokemon-monitor"
+
+CHALLENGE_MARKERS = (
+    "access denied",
+    "_incapsula_",
+    "pardon our interruption",
+    "captcha",
+    "cf-challenge",
+    "just a moment",
+)
+
+# One browser at a time: persistent Chromium profiles are locked per user-data-dir,
+# and serializing keeps resource usage predictable.
+# Created lazily so the Lock binds the running event loop (Python 3.9 binds eagerly
+# at construction; a module-level Lock would bind the wrong loop under asyncio.run).
+_BROWSER_LOCK: asyncio.Lock | None = None
+
+
+def _browser_lock() -> asyncio.Lock:
+    global _BROWSER_LOCK
+    if _BROWSER_LOCK is None:
+        _BROWSER_LOCK = asyncio.Lock()
+    return _BROWSER_LOCK
+
+
+def is_challenge_page(html: str) -> bool:
+    lowered = html.lower()
+    return any(marker in lowered for marker in CHALLENGE_MARKERS)
+
+
+async def fetch_page_html(url: str, profile: str, settle_ms: int = 5_000) -> str:
+    """Load `url` in a real (headed) Chromium with a persistent per-profile context
+    and return the rendered HTML."""
+    profile_dir = PROFILE_ROOT / profile
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    async with _browser_lock():
+        async with async_playwright() as p:
+            context = await p.chromium.launch_persistent_context(
+                str(profile_dir),
+                headless=False,
+                viewport={"width": 1280, "height": 900},
+                locale="en-CA",
+            )
+            try:
+                page = await context.new_page()
+                await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+                await page.wait_for_timeout(settle_ms)
+                return await page.content()
+            finally:
+                await context.close()
+
+
+async def fetch_page_html_with_challenge_retry(
+    url: str,
+    profile: str,
+    is_challenge,
+    settle_ms: int = 5_000,
+    retries: int = 2,
+    retry_wait_ms: int = 10_000,
+) -> str:
+    """Like fetch_page_html, but if the initial settle still looks like a
+    challenge page, keep the same page/session open and wait+re-read up to
+    `retries` more times before giving up. Returns the last HTML read
+    (challenge or not)."""
+    profile_dir = PROFILE_ROOT / profile
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    async with _browser_lock():
+        async with async_playwright() as p:
+            context = await p.chromium.launch_persistent_context(
+                str(profile_dir),
+                headless=False,
+                viewport={"width": 1280, "height": 900},
+                locale="en-CA",
+            )
+            try:
+                page = await context.new_page()
+                await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+                await page.wait_for_timeout(settle_ms)
+                html = await page.content()
+                attempt = 0
+                while is_challenge(html) and attempt < retries:
+                    await page.wait_for_timeout(retry_wait_ms)
+                    html = await page.content()
+                    attempt += 1
+                return html
+            finally:
+                await context.close()
