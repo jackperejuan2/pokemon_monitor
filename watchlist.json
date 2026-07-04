@@ -40,6 +40,19 @@
     {"name": "Perfect Order Booster Display Box (36 packs)", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10380-119", "max_price": 360.00},
     {"name": "Pitch Black Booster Display Box (36 packs)", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10425-120/pokemon-tcg-mega-evolution-pitch-black-booster-display-box-36-packs", "max_price": 360.00},
     {"name": "Pitch Black Pokemon Center Elite Trainer Box", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10416-112/pokemon-tcg-mega-evolution-pitch-black-pokemon-center-elite-trainer-box", "max_price": 110.00},
-    {"name": "Pitch Black Booster Bundle", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10422-109/pokemon-tcg-mega-evolution-pitch-black-booster-bundle-6-packs", "max_price": 60.00}
+    {"name": "Pitch Black Booster Bundle", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10422-109/pokemon-tcg-mega-evolution-pitch-black-booster-bundle-6-packs", "max_price": 60.00},
+
+    {"name": "Mega Evolution (base) Booster Box (36 packs)", "retailer": "bestbuy", "sku": "19586360", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-base-set-booster-box/19586360", "max_price": 360.00},
+    {"name": "Mega Evolution (base) Elite Trainer Box (Mega Lucario ex)", "retailer": "bestbuy", "sku": "19482763", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-base-set-elite-trainer-box-mega-lucario-ex/19482763", "max_price": 90.00},
+    {"name": "Mega Evolution (base) Booster Bundle", "retailer": "bestbuy", "sku": "19492017", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-booster-bundle/19492017", "max_price": 60.00},
+    {"name": "Mega Evolution (base) Enhanced Booster Display Box (36 packs)", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10057-127/pokemon-tcg-mega-evolution-enhanced-booster-display-box-36-packs-and-1-promo-card", "max_price": 360.00},
+    {"name": "Mega Evolution (base) Pokemon Center Elite Trainer Box (Mega Lucario)", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10047-108/pokemon-tcg-mega-evolution-pokemon-center-elite-trainer-box-mega-lucario", "max_price": 110.00},
+    {"name": "Mega Evolution (base) Pokemon Center Elite Trainer Box (Mega Gardevoir)", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10047-120/", "max_price": 110.00},
+
+    {"name": "Journey Together Elite Trainer Box", "retailer": "bestbuy", "sku": "19303801", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-journey-together-elite-trainer-box/19303801", "max_price": 90.00},
+    {"name": "Journey Together Booster Bundle", "retailer": "bestbuy", "sku": "19319821", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-journey-together-booster-bundle/19319821", "max_price": 60.00},
+    {"name": "Journey Together 3-Pack Blister", "retailer": "bestbuy", "sku": "19437389", "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-9-journey-together-three-booster-blister/19437389", "max_price": 30.00},
+    {"name": "Journey Together Pokemon Center Elite Trainer Box", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/100-10356/pokemon-tcg-scarlet-and-violet-journey-together-pokemon-center-elite-trainer-box", "max_price": 110.00},
+    {"name": "Journey Together Enhanced Booster Display Box (36 packs)", "retailer": "pokemoncenter", "url": "https://www.pokemoncenter.com/en-ca/product/10-10125-102/pokemon-tcg-scarlet-and-violet-journey-together-enhanced-booster-display-box-36-packs-and-1-promo-card", "max_price": 360.00}
   ]
 }
