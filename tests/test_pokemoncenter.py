@@ -2,6 +2,8 @@ import asyncio
 
 import pytest
 
+from adapters.browser import _browser_lock as browser_module_lock
+from adapters.browser import is_challenge_page as browser_module_is_challenge_page
 from adapters.pokemoncenter import _browser_lock, is_challenge_page
 
 
@@ -11,10 +13,21 @@ from adapters.pokemoncenter import _browser_lock, is_challenge_page
         "<html><body>Access Denied</body></html>",
         "<html><script src='/_Incapsula_Resource?x=1'></script></html>",
         "<html><body>Pardon Our Interruption</body></html>",
+        "<html><body>Just a moment...</body></html>",
+        "<html><body>cf-challenge running</body></html>",
     ],
 )
 def test_detects_challenge_pages(html):
     assert is_challenge_page(html)
+
+
+def test_is_challenge_page_importable_from_browser_module():
+    assert browser_module_is_challenge_page("<html>Access Denied</html>")
+    assert browser_module_is_challenge_page is is_challenge_page
+
+
+def test_browser_lock_importable_from_browser_module():
+    assert browser_module_lock is _browser_lock
 
 
 def test_normal_page_is_not_challenge():

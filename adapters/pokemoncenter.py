@@ -1,61 +1,45 @@
 from __future__ import annotations
 
-import asyncio
-from pathlib import Path
-
 import httpx
-from playwright.async_api import async_playwright
 
 from .base import Blocked, Product, StockResult
+from .browser import (
+    CHALLENGE_MARKERS,
+    _browser_lock,
+    fetch_page_html_with_challenge_retry,
+    is_challenge_page,
+)
 from .jsonld import parse_stock_from_html
 
-PROFILE_DIR = Path.home() / ".pokemon-monitor" / "pc-profile"
-CHALLENGE_MARKERS = ("access denied", "_incapsula_", "pardon our interruption", "captcha")
+# Re-exported for backwards compatibility: tests and any external callers
+# import CHALLENGE_MARKERS/_browser_lock/is_challenge_page from this module.
+__all__ = [
+    "CHALLENGE_MARKERS",
+    "PokemonCenterAdapter",
+    "is_challenge_page",
+]
 
-# PROFILE_DIR is a shared Chromium user-data-dir guarded by a SingletonLock;
-# concurrent launches against it hang/throw, so serialize browser sessions.
-_BROWSER_LOCK: asyncio.Lock | None = None
-
-
-def _browser_lock() -> asyncio.Lock:
-    # Created lazily inside the running loop: on Python 3.9 asyncio.Lock()
-    # eagerly binds get_event_loop() at creation, so a module-level instance
-    # would bind the wrong loop and raise under contention inside asyncio.run.
-    # The singleton binds the first loop that calls it — correct for this
-    # project's single-asyncio.run-per-process model.
-    global _BROWSER_LOCK
-    if _BROWSER_LOCK is None:
-        _BROWSER_LOCK = asyncio.Lock()
-    return _BROWSER_LOCK
-
-
-def is_challenge_page(html: str) -> bool:
-    lowered = html.lower()
-    return any(marker in lowered for marker in CHALLENGE_MARKERS)
+PROFILE_NAME = "pc-profile"
 
 
 class PokemonCenterAdapter:
     """Loads the product page in a real (headed) Chromium with a persistent
-    profile, then reuses the JSON-LD/marker parser on the rendered HTML."""
+    profile, then reuses the JSON-LD/marker parser on the rendered HTML.
+
+    Incapsula challenge pages typically auto-resolve via JS within ~5-15s, so
+    we keep the page open and re-read the content a couple more times before
+    giving up.
+    """
 
     async def check(self, client: httpx.AsyncClient, product: Product) -> StockResult:
         # `client` is unused: Pokemon Center blocks plain HTTP.
-        PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-        async with _browser_lock():
-            async with async_playwright() as p:
-                context = await p.chromium.launch_persistent_context(
-                    str(PROFILE_DIR),
-                    headless=False,
-                    viewport={"width": 1280, "height": 900},
-                    locale="en-CA",
-                )
-                try:
-                    page = await context.new_page()
-                    await page.goto(product.url, wait_until="domcontentloaded", timeout=60_000)
-                    await page.wait_for_timeout(5_000)  # let JS/anti-bot settle
-                    html = await page.content()
-                finally:
-                    await context.close()
+        html = await fetch_page_html_with_challenge_retry(
+            product.url,
+            profile=PROFILE_NAME,
+            is_challenge=is_challenge_page,
+            retries=2,
+            retry_wait_ms=10_000,
+        )
         if is_challenge_page(html):
             raise Blocked("pokemoncenter served a challenge page")
         return parse_stock_from_html(html, product.url)
