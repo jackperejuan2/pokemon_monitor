@@ -105,3 +105,39 @@ def test_safe_reload_keeps_previous_on_error():
         return ["fresh"]
 
     assert safe_reload(ok, previous, "watchlist.json") == ["fresh"]
+
+
+def test_process_product_survives_state_save_failure(monkeypatch):
+    import asyncio
+    from collections import defaultdict
+
+    import monitor
+    from adapters import ADAPTERS
+    from adapters.base import Status, StockResult
+
+    class FakeAdapter:
+        async def check(self, client, prod):
+            return StockResult(status=Status.IN_STOCK, price=Decimal("1"))
+
+    class FakeNotifier:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, embed):
+            self.sent.append(embed)
+
+    def boom(states):
+        raise OSError("disk full")
+
+    monkeypatch.setitem(ADAPTERS, "faketailer", FakeAdapter())
+    monkeypatch.setattr(monitor, "save_state", boom)
+
+    notifier = FakeNotifier()
+    states = {}
+    health = defaultdict(RetailerHealth)
+    prod = product("faketailer")
+    # Must not raise, state must still be updated in memory, and the
+    # restock alert must still be sent even though persistence failed.
+    asyncio.run(monitor.process_product(None, notifier, prod, states, health))
+    assert states[prod.key].price_ok is True
+    assert any("RESTOCK" in embed.get("title", "") for embed in notifier.sent)

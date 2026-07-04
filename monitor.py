@@ -149,7 +149,10 @@ async def process_product(client, notifier, product, states, health):
     prev = states.get(product.key, ProductState())
     decision = decide(prev, result, product, datetime.now())
     states[product.key] = decision.new_state
-    save_state(states)
+    try:
+        save_state(states)
+    except Exception:
+        log.exception("could not persist state")
     log.info("%s %s -> %s price=%s alert=%s",
              product.retailer, product.name, result.status.value, result.price, decision.alert)
     if decision.alert == "restock":
@@ -198,7 +201,13 @@ async def run():
             for product in products:
                 if now < next_check.get(product.key, now):
                     continue
-                await process_product(client, notifier, product, states, health)
+                try:
+                    await asyncio.wait_for(
+                        process_product(client, notifier, product, states, health),
+                        timeout=180,
+                    )
+                except asyncio.TimeoutError:
+                    log.warning("check timed out for %s", product.key)
                 next_check[product.key] = datetime.now() + timedelta(
                     seconds=check_interval(product, config, health[product.retailer])
                 )
