@@ -183,10 +183,11 @@ async def process_product(client, notifier, product, states, records, health) ->
 
     new_rec, changed = update_record(records.get(product.key, DashboardRecord()), result, now)
     records[product.key] = new_rec
-    try:
-        save_records(records)
-    except Exception:
-        log.exception("could not persist dashboard records")
+    if changed:
+        try:
+            save_records(records)
+        except Exception:
+            log.exception("could not persist dashboard records")
 
     log.info("%s %s -> %s price=%s alert=%s",
              product.retailer, product.name, result.status.value, result.price, decision.alert)
@@ -233,34 +234,35 @@ async def run():
                     build_heartbeat_embed(len(products), unhealthy_retailers(health))
                 )
 
-            if in_quiet_hours(now, config):
-                await asyncio.sleep(60)
-                continue
-
+            quiet = in_quiet_hours(now, config)
             dirty = False
-            for product in products:
-                if now < next_check.get(product.key, now):
-                    continue
-                try:
-                    changed = await asyncio.wait_for(
-                        process_product(client, notifier, product, states, records, health),
-                        timeout=180,
+            if not quiet:
+                for product in products:
+                    if now < next_check.get(product.key, now):
+                        continue
+                    try:
+                        changed = await asyncio.wait_for(
+                            process_product(client, notifier, product, states, records, health),
+                            timeout=180,
+                        )
+                        dirty = dirty or bool(changed)
+                    except asyncio.TimeoutError:
+                        log.warning("check timed out for %s", product.key)
+                    next_check[product.key] = datetime.now() + timedelta(
+                        seconds=check_interval(product, config, health[product.retailer])
                     )
-                    dirty = dirty or bool(changed)
-                except asyncio.TimeoutError:
-                    log.warning("check timed out for %s", product.key)
-                next_check[product.key] = datetime.now() + timedelta(
-                    seconds=check_interval(product, config, health[product.retailer])
-                )
-                await asyncio.sleep(random.uniform(2, 8))  # spread checks out
-                now = datetime.now()
+                    await asyncio.sleep(random.uniform(2, 8))  # spread checks out
+                    now = datetime.now()
 
             if should_publish(dirty, is_heartbeat):
-                html = render_html(products, records, datetime.now(),
-                                   healthy=not unhealthy_retailers(health))
-                publish(html)
+                try:
+                    html = render_html(products, records, datetime.now(),
+                                       healthy=not unhealthy_retailers(health))
+                    publish(html)
+                except Exception:
+                    log.exception("dashboard render/publish failed")
 
-            await asyncio.sleep(5)
+            await asyncio.sleep(60 if quiet else 5)
 
 
 async def check_once():

@@ -11,7 +11,7 @@ import logging
 import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from html import escape
 from pathlib import Path
 
@@ -129,15 +129,27 @@ def _per_pack(price: Decimal, packs: int) -> str:
     return f'<span class="{cls}">${per:.2f}</span>'
 
 
+def _safe_decimal(value: str | None) -> Decimal | None:
+    """Parse a persisted price string, treating corrupt/hand-edited values as
+    missing so a bad record can never make render_html raise."""
+    if value is None:
+        return None
+    try:
+        return Decimal(value)
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
 def _row(product, rec: DashboardRecord) -> str:
     status = rec.last_status
     pill = ('<span class="pill in">in stock</span>' if status == "in_stock"
             else f'<span class="pill out">{escape(status.replace("_", " "))}</span>')
-    price = None if rec.last_price is None else Decimal(rec.last_price)
+    price = _safe_decimal(rec.last_price)
     is_buy = price is not None and price <= product.max_price
     cur = f"${price:.2f}" if price is not None else '<span class="muted">&mdash;</span>'
     perpack = _per_pack(price, product.packs) if price is not None else '<span class="muted">&mdash;</span>'
-    lowest = f"${Decimal(rec.lowest_price):.2f}" if rec.lowest_price else '<span class="muted">&mdash;</span>'
+    lowest_val = _safe_decimal(rec.lowest_price)
+    lowest = f"${lowest_val:.2f}" if lowest_val is not None else '<span class="muted">&mdash;</span>'
     tr = ' class="buy"' if is_buy else ""
     return (
         f"<tr{tr}><td>{escape(product.name)}</td>"

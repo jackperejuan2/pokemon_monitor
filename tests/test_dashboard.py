@@ -179,3 +179,15 @@ def test_render_product_with_no_record_is_safe():
     products = [_product("New Item", "bestbuy", "151", 9, 90)]
     html = d.render_html(products, {}, datetime(2026, 7, 4, 12, 0, 0), healthy=True)
     assert "New Item" in html
+
+
+def test_render_tolerates_bad_price_string():
+    from datetime import datetime
+    import dashboard as d
+    products = [_product("Corrupt Row", "bestbuy", "151", 9, 90)]
+    records = {products[0].key: d.DashboardRecord(last_price="oops", last_status="in_stock",
+                                                  lowest_price="bad")}
+    html = d.render_html(products, records, datetime(2026, 7, 4, 12, 0, 0), healthy=True)
+    assert isinstance(html, str)
+    assert "Corrupt Row" in html
+    assert "&mdash;" in html or "—" in html
