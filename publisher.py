@@ -12,8 +12,10 @@ log = logging.getLogger("publisher")
 PAGES_WORKTREE = Path.home() / ".pokemon-monitor" / "pages"
 
 
-def should_publish(dirty: bool, is_heartbeat: bool) -> bool:
-    return bool(dirty or is_heartbeat)
+def should_publish(dirty: bool, is_heartbeat: bool,
+                   minutes_since_publish: float = 0.0,
+                   max_stale_minutes: float = 30.0) -> bool:
+    return bool(dirty or is_heartbeat or minutes_since_publish >= max_stale_minutes)
 
 
 def publish(html: str, worktree: Path = PAGES_WORKTREE, runner=subprocess.run) -> bool:

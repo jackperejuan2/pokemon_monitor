@@ -4,11 +4,15 @@ from pathlib import Path
 from publisher import publish, should_publish
 
 
-def test_should_publish_on_dirty_or_heartbeat():
-    assert should_publish(True, False) is True
-    assert should_publish(False, True) is True
-    assert should_publish(True, True) is True
-    assert should_publish(False, False) is False
+def test_should_publish_dirty_heartbeat_or_stale():
+    # dirty or heartbeat always publishes
+    assert should_publish(True, False, 0) is True
+    assert should_publish(False, True, 0) is True
+    # nothing changed and fresh -> no publish
+    assert should_publish(False, False, 5) is False
+    # nothing changed but stale (>= 30 min) -> publish for liveness
+    assert should_publish(False, False, 30) is True
+    assert should_publish(False, False, 45) is True
 
 
 def test_publish_writes_index_and_runs_git(tmp_path):
