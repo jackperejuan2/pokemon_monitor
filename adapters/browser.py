@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 
 from playwright.async_api import async_playwright
+
+log = logging.getLogger("browser")
 
 PROFILE_ROOT = Path.home() / ".pokemon-monitor"
 
@@ -39,6 +42,27 @@ def is_challenge_page(html: str) -> bool:
     return any(marker in lowered for marker in CHALLENGE_MARKERS)
 
 
+async def _minimize_window(context, page) -> None:
+    """Best-effort: minimize the browser window to the Dock so headed checks
+    don't cover the user's screen.
+
+    macOS clamps off-screen window positions back on-screen (a fully off-screen
+    move leaves a ~40px sliver), so positioning can't hide the window. A
+    *minimized* window leaves the screen entirely (into the Dock) while keeping
+    document.visibilityState == "visible", so it doesn't read as a hidden/bot
+    tab. Failure here must never break a check — a visible window beats a crash.
+    """
+    try:
+        cdp = await context.new_cdp_session(page)
+        win = await cdp.send("Browser.getWindowForTarget")
+        await cdp.send(
+            "Browser.setWindowBounds",
+            {"windowId": win["windowId"], "bounds": {"windowState": "minimized"}},
+        )
+    except Exception as exc:  # best-effort; a visible window is fine, a crash is not
+        log.debug("could not minimize browser window: %s", exc)
+
+
 def build_launch_kwargs(
     headless: bool = False,
     channel: str | None = None,
@@ -54,16 +78,22 @@ def build_launch_kwargs(
         # Use the real installed browser (e.g. Google Chrome) and reduce the
         # most obvious automation signals. Not a full evasion suite by design.
         #
-        # Bot detection blocks *headless* Chrome, not off-screen headed Chrome:
-        # the window must render, but it need not be visible to the user. Park it
-        # far off-screen (and size it to match the viewport) so checks run
-        # without popping windows in front of whatever the user is doing.
+        # Bot detection blocks *headless* Chrome, so we must run headed — but the
+        # window need not be visible to the user. macOS clamps off-screen window
+        # positions back on-screen, so instead we minimize the window to the Dock
+        # right after it opens (see _minimize_window). A minimized window keeps
+        # document.visibilityState == "visible" (no bot signal), but its renderer
+        # can be throttled as occluded/backgrounded; these flags disable that so
+        # the check still loads at full speed. --window-size sets the initial
+        # bounds so the layout renders as expected before minimizing.
         vp = kwargs["viewport"]
         kwargs["channel"] = channel
         kwargs["args"] = [
             "--disable-blink-features=AutomationControlled",
-            "--window-position=-3000,-3000",
             f"--window-size={vp['width']},{vp['height']}",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-background-timer-throttling",
         ]
         kwargs["ignore_default_args"] = ["--enable-automation"]
     return kwargs
@@ -89,6 +119,8 @@ async def fetch_page_html(
             )
             try:
                 page = await context.new_page()
+                if not headless:
+                    await _minimize_window(context, page)
                 await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
                 await page.wait_for_timeout(settle_ms)
                 return await page.content()
@@ -120,6 +152,8 @@ async def fetch_page_html_with_challenge_retry(
             )
             try:
                 page = await context.new_page()
+                if not headless:
+                    await _minimize_window(context, page)
                 await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
                 await page.wait_for_timeout(settle_ms)
                 html = await page.content()
