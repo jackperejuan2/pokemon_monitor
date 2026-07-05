@@ -105,3 +105,24 @@ def test_build_launch_kwargs_channel_chrome():
     assert kwargs["channel"] == "chrome"
     assert "--disable-blink-features=AutomationControlled" in kwargs["args"]
     assert "--enable-automation" in kwargs["ignore_default_args"]
+
+
+def test_build_launch_kwargs_channel_parks_window_offscreen():
+    # Real headed Chrome is required (headless is blocked), but the window does
+    # not need to be visible to the user. Park it far off-screen so checks run
+    # without popping windows in front of the user's work.
+    kwargs = build_launch_kwargs(channel="chrome")
+    assert "--window-position=-3000,-3000" in kwargs["args"]
+    assert "--window-size=1280,900" in kwargs["args"]
+
+
+def test_build_launch_kwargs_offscreen_matches_viewport():
+    kwargs = build_launch_kwargs(channel="chrome", viewport={"width": 800, "height": 600})
+    assert "--window-size=800,600" in kwargs["args"]
+
+
+def test_build_launch_kwargs_no_channel_has_no_window_args():
+    # Off-screen positioning only applies to the real-browser channel path;
+    # the default headless/httpx path must be untouched.
+    kwargs = build_launch_kwargs()
+    assert "args" not in kwargs
