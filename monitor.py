@@ -261,8 +261,8 @@ async def run():
                 try:
                     html = render_html(products, records, now2,
                                        healthy=not unhealthy_retailers(health))
-                    publish(html)
-                    last_publish = now2
+                    if publish(html):
+                        last_publish = now2
                 except Exception:
                     log.exception("dashboard render/publish failed")
 

@@ -162,7 +162,7 @@ def _row(product, rec: DashboardRecord) -> str:
     tr = f' class="{row_cls}"' if row_cls else ""
     return (
         f"<tr{tr}><td>{escape(product.name)}{watch}</td>"
-        f'<td class="ret">{escape(product.retailer)}</td>'
+        f'<td class="muted">{escape(product.retailer)}</td>'
         f"<td>{pill}</td><td>{cur}</td><td>{perpack}</td>"
         f'<td class="muted">{lowest_s}</td>'
         f'<td><a href="{escape(product.url)}">open &#8599;</a></td></tr>'
