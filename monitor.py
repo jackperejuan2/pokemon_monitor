@@ -23,7 +23,6 @@ from adapters.base import DEFAULT_HEADERS, Blocked, Product
 from notifier import (
     Notifier,
     build_heartbeat_embed,
-    build_over_price_embed,
     build_restock_embed,
     build_system_embed,
 )
@@ -196,8 +195,6 @@ async def process_product(client, notifier, product, states, records, health) ->
              decision.alert, result.title)
     if decision.alert == "restock":
         await notifier.send(build_restock_embed(product, result))
-    elif decision.alert == "over_price":
-        await notifier.send(build_over_price_embed(product, result))
     return changed
 
 
