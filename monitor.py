@@ -157,7 +157,7 @@ async def process_product(client, notifier, product, states, records, health) ->
     try:
         result = await ADAPTERS[product.retailer].check(client, product)
     except Blocked as exc:
-        log.warning("%s blocked: %s", product.retailer, exc)
+        log.warning("%s %s blocked: %s", product.retailer, product.name, exc)
         if h.record_blocked():
             await notifier.send(
                 build_system_embed(f"**{product.retailer}** is blocking checks ({exc}). Backing off.")
