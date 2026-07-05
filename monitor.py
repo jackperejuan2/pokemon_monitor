@@ -157,7 +157,7 @@ async def process_product(client, notifier, product, states, records, health) ->
     try:
         result = await ADAPTERS[product.retailer].check(client, product)
     except Blocked as exc:
-        log.warning("%s blocked: %s", product.retailer, exc)
+        log.warning("%s %s blocked: %s", product.retailer, product.name, exc)
         if h.record_blocked():
             await notifier.send(
                 build_system_embed(f"**{product.retailer}** is blocking checks ({exc}). Backing off.")
@@ -189,8 +189,11 @@ async def process_product(client, notifier, product, states, records, health) ->
         except Exception:
             log.exception("could not persist dashboard records")
 
-    log.info("%s %s -> %s price=%s alert=%s",
-             product.retailer, product.name, result.status.value, result.price, decision.alert)
+    # Log the page title the adapter actually parsed, so a mis-fetch (right URL,
+    # wrong/blocked page) is visible in the log without a manual investigation.
+    log.info("%s %s -> %s price=%s alert=%s parsed_title=%r",
+             product.retailer, product.name, result.status.value, result.price,
+             decision.alert, result.title)
     if decision.alert == "restock":
         await notifier.send(build_restock_embed(product, result))
     elif decision.alert == "over_price":
