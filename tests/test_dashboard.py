@@ -191,3 +191,38 @@ def test_render_tolerates_bad_price_string():
     assert isinstance(html, str)
     assert "Corrupt Row" in html
     assert "&mdash;" in html or "—" in html
+
+
+def test_out_of_stock_under_max_is_not_a_buy():
+    from datetime import datetime
+    import dashboard as d
+    p = _product("PC ETB", "pokemoncenter", "Mega Evolution (base)", 11, 110)
+    recs = {p.key: d.DashboardRecord(last_price="80.99", last_status="out_of_stock",
+                                     lowest_price="80.99")}
+    html = d.render_html([p], recs, datetime(2026, 7, 4, 12, 0, 0), healthy=True)
+    assert 'class="buy"' not in html          # out of stock is never a buy
+    assert 'class="oos"' in html              # muted row
+    assert "would buy" in html                # good-price-but-oos marker
+
+
+def test_in_stock_over_max_is_not_a_buy_and_amber():
+    from datetime import datetime
+    import dashboard as d
+    p = _product("ETB", "bestbuy", "Mega Evolution (base)", 9, 90)
+    recs = {p.key: d.DashboardRecord(last_price="209.99", last_status="in_stock",
+                                     lowest_price="209.99")}
+    html = d.render_html([p], recs, datetime(2026, 7, 4, 12, 0, 0), healthy=True)
+    assert 'class="buy"' not in html          # in stock but over max
+    assert "would buy" not in html            # in stock -> no watch marker
+    assert 'class="ppo"' in html              # $/pack amber (over)
+
+
+def test_in_stock_under_max_is_a_buy_green():
+    from datetime import datetime
+    import dashboard as d
+    p = _product("Bundle", "walmart", "Chaos Rising", 6, 60)
+    recs = {p.key: d.DashboardRecord(last_price="49.98", last_status="in_stock",
+                                     lowest_price="49.98")}
+    html = d.render_html([p], recs, datetime(2026, 7, 4, 12, 0, 0), healthy=True)
+    assert 'class="buy"' in html
+    assert 'class="ppg"' in html              # $/pack green (good)
