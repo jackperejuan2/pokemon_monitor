@@ -28,24 +28,6 @@
       "packs": 1
     },
     {
-      "name": "Prismatic Evolutions Elite Trainer Box",
-      "retailer": "bestbuy",
-      "sku": "19277006",
-      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-prismatic-evolutions-elite-trainer-box/19277006",
-      "max_price": 90.0,
-      "set": "Prismatic Evolutions",
-      "packs": 9
-    },
-    {
-      "name": "Prismatic Evolutions Booster Bundle",
-      "retailer": "bestbuy",
-      "sku": "19383898",
-      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-prismatic-evolutions-booster-bundle/19383898",
-      "max_price": 60.0,
-      "set": "Prismatic Evolutions",
-      "packs": 6
-    },
-    {
       "name": "Surging Sparks Elite Trainer Box",
       "retailer": "bestbuy",
       "sku": "19355896",
@@ -193,14 +175,6 @@
       "url": "https://www.pokemoncenter.com/en-ca/product/290-85466/pokemon-tcg-scarlet-and-violet-151-pokemon-center-elite-trainer-box",
       "max_price": 110.0,
       "set": "151",
-      "packs": 11
-    },
-    {
-      "name": "Prismatic Evolutions Pokemon Center Elite Trainer Box",
-      "retailer": "pokemoncenter",
-      "url": "https://www.pokemoncenter.com/en-ca/product/100-10019/pokemon-tcg-scarlet-and-violet-prismatic-evolutions-pokemon-center-elite-trainer-box",
-      "max_price": 110.0,
-      "set": "Prismatic Evolutions",
       "packs": 11
     },
     {
