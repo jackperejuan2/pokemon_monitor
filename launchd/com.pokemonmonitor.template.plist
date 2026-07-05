@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Portable LaunchAgent template. __HOME__ is replaced with the running
+     user's home directory by scripts/setup-monitor-user.sh, so this same
+     file works for any user (e.g. a dedicated background monitor account). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.pokemonmonitor</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__HOME__/pokemon-monitor/.venv/bin/python</string>
+    <string>__HOME__/pokemon-monitor/monitor.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__HOME__/pokemon-monitor</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>__HOME__/pokemon-monitor/logs/monitor.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/pokemon-monitor/logs/monitor.err.log</string>
+</dict>
+</plist>
