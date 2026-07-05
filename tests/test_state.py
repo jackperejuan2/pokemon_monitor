@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 
 from adapters.base import Product, Status, StockResult
@@ -40,20 +40,12 @@ def test_restock_realerts_after_going_oos_and_back():
     assert d.alert == "restock"
 
 
-def test_over_price_notice_first_time():
+def test_in_stock_over_max_does_not_alert():
+    # "In stock over max" is noise — we only alert on at/under-max restocks.
     d = decide(ProductState(status="out_of_stock"), in_stock("89.99"), PRODUCT, NOW)
-    assert d.alert == "over_price"
-    assert d.new_state.last_over_price_alert == NOW.isoformat()
-
-
-def test_over_price_notice_rate_limited_to_daily():
-    prev = ProductState(
-        status="in_stock", price_ok=False, last_over_price_alert=NOW.isoformat()
-    )
-    within_day = decide(prev, in_stock("89.99"), PRODUCT, NOW + timedelta(hours=23))
-    assert within_day.alert is None
-    next_day = decide(prev, in_stock("89.99"), PRODUCT, NOW + timedelta(hours=25))
-    assert next_day.alert == "over_price"
+    assert d.alert is None
+    assert d.new_state.status == "in_stock"
+    assert d.new_state.price_ok is False
 
 
 def test_price_drop_to_max_while_in_stock_alerts_restock():
@@ -62,9 +54,9 @@ def test_price_drop_to_max_while_in_stock_alerts_restock():
     assert d.alert == "restock"
 
 
-def test_unknown_price_in_stock_gets_over_price_notice():
+def test_unknown_price_in_stock_over_max_state_does_not_alert():
     d = decide(ProductState(status="out_of_stock"), in_stock(None), PRODUCT, NOW)
-    assert d.alert == "over_price"
+    assert d.alert is None
 
 
 def test_unknown_result_keeps_previous_state_and_no_alert():
@@ -113,14 +105,6 @@ def test_save_state_atomic_leaves_no_tmp_and_parses(tmp_path, monkeypatch):
     assert json.loads(path.read_text())
 
 
-def test_corrupt_last_over_price_alert_fails_open():
-    prev = ProductState(
-        status="in_stock", price_ok=False, last_over_price_alert="not-a-date"
-    )
-    d = decide(prev, in_stock("89.99"), PRODUCT, NOW)
-    assert d.alert == "over_price"
-
-
 def test_load_state_ignores_unknown_keys(tmp_path, monkeypatch):
     import json
 
@@ -145,8 +129,10 @@ def test_price_flake_while_price_ok_keeps_state_and_no_alert():
     assert d.new_state.status == "in_stock"
 
 
-def test_confirmed_over_price_while_price_ok_still_alerts():
+def test_price_jump_over_max_goes_quiet_and_resets_price_ok():
+    # A previously-good item that jumps over max stops being a buy; no alert,
+    # and price_ok resets so a later drop back under max re-alerts.
     prev = ProductState(status="in_stock", price_ok=True)
     d = decide(prev, in_stock("89.99"), PRODUCT, NOW)
-    assert d.alert == "over_price"
+    assert d.alert is None
     assert d.new_state.price_ok is False
