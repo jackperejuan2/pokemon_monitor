@@ -210,6 +210,7 @@ async def run():
     notifier = Notifier(config["discord_webhook_url"])
     states = load_state()
     records = load_records()
+    last_publish = None
     health = defaultdict(RetailerHealth)
     next_check = {}
     last_heartbeat_date = None
@@ -254,11 +255,14 @@ async def run():
                     await asyncio.sleep(random.uniform(2, 8))  # spread checks out
                     now = datetime.now()
 
-            if should_publish(dirty, is_heartbeat):
+            now2 = datetime.now()
+            minutes_since = 999.0 if last_publish is None else (now2 - last_publish).total_seconds() / 60.0
+            if should_publish(dirty, is_heartbeat, minutes_since):
                 try:
-                    html = render_html(products, records, datetime.now(),
+                    html = render_html(products, records, now2,
                                        healthy=not unhealthy_retailers(health))
-                    publish(html)
+                    if publish(html):
+                        last_publish = now2
                 except Exception:
                     log.exception("dashboard render/publish failed")
 

@@ -114,19 +114,16 @@ table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:7px 12px;font-size:11px;opacity:.55;text-transform:uppercase}
 td{padding:9px 12px;border-top:1px solid rgba(255,255,255,.07)}
 tr.buy td{background:rgba(46,204,113,.14)}
+tr.buy td:first-child{border-left:3px solid #2ecc71}
+tr.oos td{color:#8a8f98}
+.watch{font-size:11px;color:#8a8f98;margin-left:8px}
+.ppg{color:#7ee2a8;font-weight:600}
+.ppo{color:#e6b566;font-weight:600}
+.ppm{color:#8a8f98}
 .pill{font-size:11px;padding:2px 7px;border-radius:20px}
 .in{background:rgba(46,204,113,.22);color:#7ee2a8}.out{background:rgba(255,255,255,.09);opacity:.6}
-.good{color:#7ee2a8;font-weight:600}.bad{color:#e8a0a0;font-weight:600}
 .muted{opacity:.45}a{color:#6db3f2;text-decoration:none}
 """
-
-
-def _per_pack(price: Decimal, packs: int) -> str:
-    if packs <= 0:
-        return '<span class="muted">&mdash;</span>'
-    per = price / packs
-    cls = "good" if per <= 10 else "bad"
-    return f'<span class="{cls}">${per:.2f}</span>'
 
 
 def _safe_decimal(value: str | None) -> Decimal | None:
@@ -142,20 +139,32 @@ def _safe_decimal(value: str | None) -> Decimal | None:
 
 def _row(product, rec: DashboardRecord) -> str:
     status = rec.last_status
-    pill = ('<span class="pill in">in stock</span>' if status == "in_stock"
-            else f'<span class="pill out">{escape(status.replace("_", " "))}</span>')
+    in_stock = status == "in_stock"
     price = _safe_decimal(rec.last_price)
-    is_buy = price is not None and price <= product.max_price
+    lowest = _safe_decimal(rec.lowest_price)
+    under_max = price is not None and price <= product.max_price
+    is_buy = in_stock and under_max
+
+    pill = ('<span class="pill in">in stock</span>' if in_stock
+            else f'<span class="pill out">{escape(status.replace("_", " "))}</span>')
+    watch = "" if in_stock or not under_max else ' <span class="watch">&#9737; would buy</span>'
+
     cur = f"${price:.2f}" if price is not None else '<span class="muted">&mdash;</span>'
-    perpack = _per_pack(price, product.packs) if price is not None else '<span class="muted">&mdash;</span>'
-    lowest_val = _safe_decimal(rec.lowest_price)
-    lowest = f"${lowest_val:.2f}" if lowest_val is not None else '<span class="muted">&mdash;</span>'
-    tr = ' class="buy"' if is_buy else ""
+    if price is None or product.packs <= 0:
+        perpack = '<span class="muted">&mdash;</span>'
+    else:
+        per = price / product.packs
+        cls = "ppm" if not in_stock else ("ppg" if under_max else "ppo")
+        perpack = f'<span class="{cls}">${per:.2f}</span>'
+    lowest_s = f"${lowest:.2f}" if lowest is not None else '<span class="muted">&mdash;</span>'
+
+    row_cls = "buy" if is_buy else ("oos" if not in_stock else "")
+    tr = f' class="{row_cls}"' if row_cls else ""
     return (
-        f"<tr{tr}><td>{escape(product.name)}</td>"
+        f"<tr{tr}><td>{escape(product.name)}{watch}</td>"
         f'<td class="muted">{escape(product.retailer)}</td>'
         f"<td>{pill}</td><td>{cur}</td><td>{perpack}</td>"
-        f'<td class="muted">{lowest}</td>'
+        f'<td class="muted">{lowest_s}</td>'
         f'<td><a href="{escape(product.url)}">open &#8599;</a></td></tr>'
     )
 
