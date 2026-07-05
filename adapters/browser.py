@@ -53,8 +53,18 @@ def build_launch_kwargs(
     if channel:
         # Use the real installed browser (e.g. Google Chrome) and reduce the
         # most obvious automation signals. Not a full evasion suite by design.
+        #
+        # Bot detection blocks *headless* Chrome, not off-screen headed Chrome:
+        # the window must render, but it need not be visible to the user. Park it
+        # far off-screen (and size it to match the viewport) so checks run
+        # without popping windows in front of whatever the user is doing.
+        vp = kwargs["viewport"]
         kwargs["channel"] = channel
-        kwargs["args"] = ["--disable-blink-features=AutomationControlled"]
+        kwargs["args"] = [
+            "--disable-blink-features=AutomationControlled",
+            "--window-position=-3000,-3000",
+            f"--window-size={vp['width']},{vp['height']}",
+        ]
         kwargs["ignore_default_args"] = ["--enable-automation"]
     return kwargs
 
