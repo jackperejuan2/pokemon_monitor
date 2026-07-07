@@ -10,7 +10,11 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import random
+import signal
+import stat
+import subprocess
 from collections import defaultdict
 from datetime import datetime, time as dtime, timedelta
 from decimal import Decimal
@@ -20,6 +24,7 @@ import httpx
 
 from adapters import ADAPTERS
 from adapters.base import DEFAULT_HEADERS, Blocked, Product
+from adapters.browser import shutdown_browser
 from notifier import (
     Notifier,
     build_heartbeat_embed,
@@ -35,6 +40,105 @@ WATCHLIST_PATH = BASE_DIR / "watchlist.json"
 CONFIG_PATH = BASE_DIR / "config.json"
 
 log = logging.getLogger("monitor")
+
+# Bound the shared HTTP client's connection pool so a burst of checks can't
+# fan out unlimited concurrent connections. keepalive_expiry recycles idle
+# sockets promptly instead of holding them open.
+HTTP_LIMITS = httpx.Limits(
+    max_connections=20, max_keepalive_connections=10, keepalive_expiry=30.0
+)
+
+
+def count_own_socket_fds() -> int:
+    """Number of socket file descriptors this process currently holds. Cheap
+    (reads /dev/fd). Returns -1 if it can't be determined. Note this counts only
+    *our* live sockets — TIME_WAIT sockets are kernel-side after close and are
+    tracked separately by count_system_time_wait()."""
+    try:
+        fds = os.listdir("/dev/fd")
+    except OSError:
+        return -1
+    count = 0
+    for entry in fds:
+        try:
+            mode = os.fstat(int(entry)).st_mode
+        except (OSError, ValueError):
+            continue
+        if stat.S_ISSOCK(mode):
+            count += 1
+    return count
+
+
+def count_system_time_wait() -> int:
+    """Machine-wide count of sockets in TIME_WAIT. This is the metric that
+    actually predicts ephemeral-port exhaustion (the failure that broke all
+    outbound networking). Returns -1 if netstat is unavailable."""
+    try:
+        out = subprocess.run(
+            ["netstat", "-an", "-p", "tcp"],
+            capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return -1
+    return out.stdout.count("TIME_WAIT")
+
+
+class SocketHealth:
+    """Lightweight leak canary. Logs our socket-FD count every iteration and,
+    less often, the machine-wide TIME_WAIT count; warns loudly (log + Discord,
+    once per episode) when either climbs past a sane threshold."""
+
+    OWN_SOCKET_WARN = 200          # a healthy monitor sits well under this
+    SYSTEM_TIME_WAIT_WARN = 8000   # ~half the 16k ephemeral range
+    SYSTEM_CHECK_INTERVAL = timedelta(minutes=5)
+
+    def __init__(self) -> None:
+        self._last_system_check: datetime | None = None
+        self._warned_own = False
+        self._warned_system = False
+
+    async def check(self, notifier) -> None:
+        own = count_own_socket_fds()
+        log.info("socket health: own_socket_fds=%d", own)
+        if own > self.OWN_SOCKET_WARN:
+            if not self._warned_own:
+                self._warned_own = True
+                log.error("own socket FDs high (%d > %d); possible connection leak",
+                          own, self.OWN_SOCKET_WARN)
+                await self._notify(
+                    notifier,
+                    f"Monitor is holding {own} socket FDs (> {self.OWN_SOCKET_WARN}). "
+                    "Possible connection leak.",
+                )
+        else:
+            self._warned_own = False
+
+        now = datetime.now()
+        if (self._last_system_check is None
+                or now - self._last_system_check >= self.SYSTEM_CHECK_INTERVAL):
+            self._last_system_check = now
+            time_wait = count_system_time_wait()
+            log.info("socket health: system_time_wait=%d", time_wait)
+            if time_wait > self.SYSTEM_TIME_WAIT_WARN:
+                if not self._warned_system:
+                    self._warned_system = True
+                    log.error("system TIME_WAIT high (%d > %d); ephemeral-port "
+                              "exhaustion risk", time_wait, self.SYSTEM_TIME_WAIT_WARN)
+                    await self._notify(
+                        notifier,
+                        f"System has {time_wait} sockets in TIME_WAIT "
+                        f"(> {self.SYSTEM_TIME_WAIT_WARN}). Ephemeral-port "
+                        "exhaustion risk — outbound networking may break soon.",
+                    )
+            else:
+                self._warned_system = False
+
+    @staticmethod
+    async def _notify(notifier, message: str) -> None:
+        try:
+            await notifier.send(build_system_embed(message))
+        except Exception:
+            log.exception("could not send socket-health alert")
 
 
 class RetailerHealth:
@@ -215,72 +319,103 @@ async def run():
     next_check = {}
     last_heartbeat_date = None
     products = []
+    sockets = SocketHealth()
 
-    await notifier.send(build_system_embed("Monitor started."))
+    # Graceful shutdown: SIGINT/SIGTERM (launchd sends SIGTERM on stop/unload)
+    # set the stop event so the loop exits and the finally block closes the
+    # browser and HTTP clients cleanly instead of orphaning them.
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, stop.set)
+        except (NotImplementedError, RuntimeError):
+            pass  # signal handlers unavailable (e.g. non-Unix); best effort
 
-    async with httpx.AsyncClient(
-        headers=DEFAULT_HEADERS, follow_redirects=True, timeout=30
-    ) as client:
-        while True:
-            config = safe_reload(load_config, config, "config.json")
-            products = safe_reload(load_watchlist, products, "watchlist.json")
-            now = datetime.now()
+    try:
+        await notifier.send(build_system_embed("Monitor started."))
 
-            is_heartbeat = False
-            heartbeat_hour = config.get("heartbeat_hour", 9)
-            if now.hour >= heartbeat_hour and last_heartbeat_date != now.date():
-                last_heartbeat_date = now.date()
-                is_heartbeat = True
-                await notifier.send(
-                    build_heartbeat_embed(len(products), unhealthy_retailers(health))
-                )
+        async with httpx.AsyncClient(
+            headers=DEFAULT_HEADERS, follow_redirects=True, timeout=30,
+            limits=HTTP_LIMITS,
+        ) as client:
+            while not stop.is_set():
+                config = safe_reload(load_config, config, "config.json")
+                products = safe_reload(load_watchlist, products, "watchlist.json")
+                now = datetime.now()
 
-            quiet = in_quiet_hours(now, config)
-            dirty = False
-            if not quiet:
-                for product in products:
-                    if now < next_check.get(product.key, now):
-                        continue
-                    try:
-                        changed = await asyncio.wait_for(
-                            process_product(client, notifier, product, states, records, health),
-                            timeout=180,
-                        )
-                        dirty = dirty or bool(changed)
-                    except asyncio.TimeoutError:
-                        log.warning("check timed out for %s", product.key)
-                    next_check[product.key] = datetime.now() + timedelta(
-                        seconds=check_interval(product, config, health[product.retailer])
+                is_heartbeat = False
+                heartbeat_hour = config.get("heartbeat_hour", 9)
+                if now.hour >= heartbeat_hour and last_heartbeat_date != now.date():
+                    last_heartbeat_date = now.date()
+                    is_heartbeat = True
+                    await notifier.send(
+                        build_heartbeat_embed(len(products), unhealthy_retailers(health))
                     )
-                    await asyncio.sleep(random.uniform(2, 8))  # spread checks out
-                    now = datetime.now()
 
-            now2 = datetime.now()
-            minutes_since = 999.0 if last_publish is None else (now2 - last_publish).total_seconds() / 60.0
-            if should_publish(dirty, is_heartbeat, minutes_since):
+                quiet = in_quiet_hours(now, config)
+                dirty = False
+                if not quiet:
+                    for product in products:
+                        if stop.is_set():
+                            break
+                        if now < next_check.get(product.key, now):
+                            continue
+                        try:
+                            changed = await asyncio.wait_for(
+                                process_product(client, notifier, product, states, records, health),
+                                timeout=180,
+                            )
+                            dirty = dirty or bool(changed)
+                        except asyncio.TimeoutError:
+                            log.warning("check timed out for %s", product.key)
+                        next_check[product.key] = datetime.now() + timedelta(
+                            seconds=check_interval(product, config, health[product.retailer])
+                        )
+                        await asyncio.sleep(random.uniform(2, 8))  # spread checks out
+                        now = datetime.now()
+
+                now2 = datetime.now()
+                minutes_since = 999.0 if last_publish is None else (now2 - last_publish).total_seconds() / 60.0
+                if should_publish(dirty, is_heartbeat, minutes_since):
+                    try:
+                        html = render_html(products, records, now2,
+                                           healthy=not unhealthy_retailers(health))
+                        if publish(html):
+                            last_publish = now2
+                    except Exception:
+                        log.exception("dashboard render/publish failed")
+
+                await sockets.check(notifier)
+
+                # Interruptible idle wait: wakes immediately on SIGINT/SIGTERM
+                # so shutdown is prompt instead of blocking a full sleep.
                 try:
-                    html = render_html(products, records, now2,
-                                       healthy=not unhealthy_retailers(health))
-                    if publish(html):
-                        last_publish = now2
-                except Exception:
-                    log.exception("dashboard render/publish failed")
-
-            await asyncio.sleep(60 if quiet else 5)
+                    await asyncio.wait_for(stop.wait(), timeout=60 if quiet else 5)
+                except asyncio.TimeoutError:
+                    pass
+    finally:
+        log.info("shutting down: closing browser and HTTP clients")
+        await shutdown_browser()
+        await notifier.aclose()
 
 
 async def check_once():
     products = load_watchlist()
-    async with httpx.AsyncClient(
-        headers=DEFAULT_HEADERS, follow_redirects=True, timeout=30
-    ) as client:
-        for product in products:
-            try:
-                result = await ADAPTERS[product.retailer].check(client, product)
-                print(f"{product.retailer:15} {product.name[:40]:40} "
-                      f"{result.status.value:13} price={result.price}")
-            except Exception as exc:
-                print(f"{product.retailer:15} {product.name[:40]:40} ERROR: {exc}")
+    try:
+        async with httpx.AsyncClient(
+            headers=DEFAULT_HEADERS, follow_redirects=True, timeout=30,
+            limits=HTTP_LIMITS,
+        ) as client:
+            for product in products:
+                try:
+                    result = await ADAPTERS[product.retailer].check(client, product)
+                    print(f"{product.retailer:15} {product.name[:40]:40} "
+                          f"{result.status.value:13} price={result.price}")
+                except Exception as exc:
+                    print(f"{product.retailer:15} {product.name[:40]:40} ERROR: {exc}")
+    finally:
+        await shutdown_browser()
 
 
 def main():
