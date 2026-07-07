@@ -428,7 +428,7 @@ async def run():
                         except asyncio.TimeoutError:
                             log.warning("check timed out for %s", product.key)
                         next_check[product.key] = datetime.now() + timedelta(
-                            seconds=check_interval(product, config, health[product.retailer])
+                            seconds=check_interval(product, config, health[product.retailer], now)
                         )
                         await asyncio.sleep(random.uniform(2, 8))  # spread checks out
                         now = datetime.now()
