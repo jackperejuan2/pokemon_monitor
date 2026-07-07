@@ -99,6 +99,156 @@ def build_launch_kwargs(
     return kwargs
 
 
+async def _close_page(page) -> None:
+    """Close a per-check tab, surviving cancellation.
+
+    When monitor.py's asyncio.wait_for() times out, it cancels this coroutine
+    mid-await. A bare `await page.close()` would then raise CancelledError before
+    the tab actually closes, orphaning it (and its sockets) inside the long-lived
+    context. Shielding lets the close finish in the background even though our
+    await is interrupted, so the tab — and its connections — are always reclaimed.
+    """
+    try:
+        await asyncio.shield(page.close())
+    except Exception:  # closing a tab must never mask the real result/error
+        pass
+
+
+class BrowserManager:
+    """Owns a single long-lived Playwright driver and one long-lived persistent
+    browser context per profile.
+
+    The old code launched a fresh Playwright driver *and* a fresh Chromium on
+    every single check, then tore both down — so each check cold-started a
+    browser, reloaded a heavy tracker-laden page, and opened dozens of outbound
+    connections that never got reused across checks. That churn piled up sockets
+    in TIME_WAIT until the machine ran out of ephemeral ports.
+
+    Here the driver starts once and each profile's persistent context is created
+    lazily and kept alive for the process lifetime. Each check opens a throwaway
+    tab in the existing (warm) context and closes it afterwards, so Chrome's
+    connection pool / keep-alive is reused across checks and nothing leaks.
+    Per-retailer profiles still give cookie/session isolation, exactly as before.
+    """
+
+    def __init__(self) -> None:
+        self._pw = None
+        self._contexts = {}  # profile name -> live persistent BrowserContext
+
+    async def _ensure_pw(self):
+        if self._pw is None:
+            self._pw = await async_playwright().start()
+        return self._pw
+
+    async def _launch_context(self, profile: str, headless: bool, channel: str | None):
+        profile_dir = PROFILE_ROOT / profile
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        pw = await self._ensure_pw()
+        context = await pw.chromium.launch_persistent_context(
+            str(profile_dir), **build_launch_kwargs(headless=headless, channel=channel)
+        )
+        # If the browser dies (crash, user quit, profile-lock loss), drop it from
+        # the cache so the next check relaunches instead of using a dead handle.
+        context.once("close", lambda *_: self._contexts.pop(profile, None))
+        # launch_persistent_context opens with one blank page/window. Keep it
+        # alive for the process lifetime (closing the last page closes the whole
+        # context) and minimize it once; per-check tabs are opened/closed on top.
+        keep = context.pages[0] if context.pages else await context.new_page()
+        if not headless:
+            await _minimize_window(context, keep)
+        self._contexts[profile] = context
+        return context
+
+    async def _acquire_page(self, profile: str, headless: bool, channel: str | None):
+        """Return (context, fresh page), relaunching once if the cached context
+        has died out from under us."""
+        for attempt in (0, 1):
+            context = self._contexts.get(profile)
+            if context is None:
+                context = await self._launch_context(profile, headless, channel)
+            try:
+                return context, await context.new_page()
+            except Exception:
+                # Cached context is dead/unusable; discard and retry once.
+                self._contexts.pop(profile, None)
+                try:
+                    await context.close()
+                except Exception:
+                    pass
+                if attempt == 1:
+                    raise
+        raise RuntimeError("unreachable")
+
+    async def fetch(
+        self,
+        url: str,
+        profile: str,
+        settle_ms: int = 5_000,
+        headless: bool = False,
+        channel: str | None = None,
+    ) -> str:
+        """Load `url` in the warm per-profile context and return rendered HTML."""
+        async with _browser_lock():
+            _context, page = await self._acquire_page(profile, headless, channel)
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+                await page.wait_for_timeout(settle_ms)
+                return await page.content()
+            finally:
+                await _close_page(page)
+
+    async def fetch_with_challenge_retry(
+        self,
+        url: str,
+        profile: str,
+        is_challenge,
+        settle_ms: int = 5_000,
+        retries: int = 2,
+        retry_wait_ms: int = 10_000,
+        headless: bool = False,
+        channel: str | None = None,
+    ) -> str:
+        """Like fetch(), but if the settled page still looks like a challenge,
+        keep the same tab/session open and wait+re-read up to `retries` more
+        times before giving up. Returns the last HTML read."""
+        async with _browser_lock():
+            _context, page = await self._acquire_page(profile, headless, channel)
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+                await page.wait_for_timeout(settle_ms)
+                html = await page.content()
+                attempt = 0
+                while is_challenge(html) and attempt < retries:
+                    await page.wait_for_timeout(retry_wait_ms)
+                    html = await page.content()
+                    attempt += 1
+                return html
+            finally:
+                await _close_page(page)
+
+    async def aclose(self) -> None:
+        """Close every live context and stop the Playwright driver. Idempotent
+        and exception-safe so it can run from a finally block or signal handler."""
+        for profile, context in list(self._contexts.items()):
+            try:
+                await context.close()
+            except Exception as exc:
+                log.debug("error closing context %s: %s", profile, exc)
+        self._contexts.clear()
+        if self._pw is not None:
+            try:
+                await self._pw.stop()
+            except Exception as exc:
+                log.debug("error stopping playwright: %s", exc)
+            self._pw = None
+
+
+# Process-wide singleton. Adapters call the module-level helpers below, so their
+# call sites are unchanged; monitor.py drives startup implicitly (lazy) and
+# shutdown explicitly via shutdown_browser().
+_MANAGER = BrowserManager()
+
+
 async def fetch_page_html(
     url: str,
     profile: str,
@@ -106,26 +256,9 @@ async def fetch_page_html(
     headless: bool = False,
     channel: str | None = None,
 ) -> str:
-    """Load `url` in a real Chromium (or, if `channel` is given, that browser
-    channel) with a persistent per-profile context and return the rendered
-    HTML."""
-    profile_dir = PROFILE_ROOT / profile
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    async with _browser_lock():
-        async with async_playwright() as p:
-            context = await p.chromium.launch_persistent_context(
-                str(profile_dir),
-                **build_launch_kwargs(headless=headless, channel=channel),
-            )
-            try:
-                page = await context.new_page()
-                if not headless:
-                    await _minimize_window(context, page)
-                await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-                await page.wait_for_timeout(settle_ms)
-                return await page.content()
-            finally:
-                await context.close()
+    return await _MANAGER.fetch(
+        url, profile, settle_ms=settle_ms, headless=headless, channel=channel
+    )
 
 
 async def fetch_page_html_with_challenge_retry(
@@ -138,30 +271,19 @@ async def fetch_page_html_with_challenge_retry(
     headless: bool = False,
     channel: str | None = None,
 ) -> str:
-    """Like fetch_page_html, but if the initial settle still looks like a
-    challenge page, keep the same page/session open and wait+re-read up to
-    `retries` more times before giving up. Returns the last HTML read
-    (challenge or not)."""
-    profile_dir = PROFILE_ROOT / profile
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    async with _browser_lock():
-        async with async_playwright() as p:
-            context = await p.chromium.launch_persistent_context(
-                str(profile_dir),
-                **build_launch_kwargs(headless=headless, channel=channel),
-            )
-            try:
-                page = await context.new_page()
-                if not headless:
-                    await _minimize_window(context, page)
-                await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-                await page.wait_for_timeout(settle_ms)
-                html = await page.content()
-                attempt = 0
-                while is_challenge(html) and attempt < retries:
-                    await page.wait_for_timeout(retry_wait_ms)
-                    html = await page.content()
-                    attempt += 1
-                return html
-            finally:
-                await context.close()
+    return await _MANAGER.fetch_with_challenge_retry(
+        url,
+        profile,
+        is_challenge,
+        settle_ms=settle_ms,
+        retries=retries,
+        retry_wait_ms=retry_wait_ms,
+        headless=headless,
+        channel=channel,
+    )
+
+
+async def shutdown_browser() -> None:
+    """Close the shared browser(s) and stop the Playwright driver. Safe to call
+    more than once and even if nothing was ever launched."""
+    await _MANAGER.aclose()

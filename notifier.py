@@ -62,26 +62,44 @@ class Notifier:
     def __init__(self, webhook_url: str, transport: httpx.AsyncBaseTransport | None = None):
         self.webhook_url = webhook_url
         self._transport = transport
+        # One reusable client for the process lifetime instead of a fresh client
+        # (and connection) per send. Created lazily so it binds the event loop
+        # that first calls send(). Bounded pool: this only ever talks to Discord.
+        self._client: httpx.AsyncClient | None = None
+
+    def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None:
+            self._client = httpx.AsyncClient(
+                timeout=15,
+                transport=self._transport,
+                limits=httpx.Limits(max_connections=4, max_keepalive_connections=2),
+            )
+        return self._client
 
     async def send(self, embed: dict) -> None:
-        async with httpx.AsyncClient(timeout=15, transport=self._transport) as client:
-            last_error = ""
-            for attempt in range(1, 4):
-                try:
-                    response = await client.post(self.webhook_url, json={"embeds": [embed]})
-                except httpx.HTTPError as exc:
-                    last_error = repr(exc)
-                    delay = 1.0
+        client = self._get_client()
+        last_error = ""
+        for attempt in range(1, 4):
+            try:
+                response = await client.post(self.webhook_url, json={"embeds": [embed]})
+            except httpx.HTTPError as exc:
+                last_error = repr(exc)
+                delay = 1.0
+            else:
+                if response.is_success:
+                    return
+                last_error = f"HTTP {response.status_code}"
+                if response.status_code == 429:
+                    delay = _retry_after_seconds(response)
                 else:
-                    if response.is_success:
-                        return
-                    last_error = f"HTTP {response.status_code}"
-                    if response.status_code == 429:
-                        delay = _retry_after_seconds(response)
-                    else:
-                        delay = 1.0
-                if attempt < 3:
-                    await asyncio.sleep(min(delay, 10))
-            log.warning(
-                "Discord webhook send failed after 3 attempts: %s", last_error
-            )
+                    delay = 1.0
+            if attempt < 3:
+                await asyncio.sleep(min(delay, 10))
+        log.warning(
+            "Discord webhook send failed after 3 attempts: %s", last_error
+        )
+
+    async def aclose(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
