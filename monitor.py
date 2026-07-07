@@ -165,11 +165,15 @@ class RetailerHealth:
             return True
         return False
 
-    def record_success(self) -> None:
+    def record_success(self) -> bool:
+        """Returns True if this success ends a blocked episode (caller may post a
+        recovery notice)."""
+        was_blocked = self.warned_blocked
         self.backoff = 1.0
         self.consecutive_errors = 0
         self.warned_blocked = False
         self.warned_errors = False
+        return was_blocked
 
 
 def load_config() -> dict:
@@ -336,7 +340,10 @@ async def process_product(client, notifier, product, states, records, health) ->
             )
         return False
 
-    h.record_success()
+    if h.record_success():
+        await notifier.send(
+            build_system_embed(f"**{product.retailer}** checks recovered — visibility restored.")
+        )
     now = datetime.now()
     prev = states.get(product.key, ProductState())
     decision = decide(prev, result, product, now)

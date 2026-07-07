@@ -82,6 +82,14 @@ def test_success_resets_health():
     assert h.record_blocked() is True  # warning re-armed after recovery
 
 
+def test_record_success_reports_recovery_once():
+    h = RetailerHealth()
+    assert h.record_success() is False        # was never blocked
+    h.record_blocked()                        # now blocked
+    assert h.record_success() is True         # first success after block -> recovered
+    assert h.record_success() is False        # subsequent successes are quiet
+
+
 def test_check_interval_bad_shape_falls_back():
     h = RetailerHealth()
     bad = {"check_interval_seconds": 200}
