@@ -370,6 +370,21 @@ def test_turbo_malformed_window_skipped():
     assert 120 <= val <= 300
 
 
+def test_turbo_unsupported_match_key_skipped():
+    # A typo'd/unsupported match key must NOT match every product; the window
+    # is malformed and we fall back to the normal tier.
+    h = RetailerHealth()
+    config = {
+        "check_interval_seconds": [120, 300],
+        "drop_windows": [{
+            "label": "typo", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+            "match": {"st": "Pitch Black"}, "interval": [90, 90],
+        }],
+    }
+    val = check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW)
+    assert 120 <= val <= 300
+
+
 def test_check_interval_now_defaults_to_wall_clock():
     h = RetailerHealth()
     assert 120 <= check_interval(product("bestbuy"), CONFIG, h) <= 300

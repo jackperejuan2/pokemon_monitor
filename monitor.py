@@ -229,6 +229,7 @@ def _parse_interval_range(raw, label: str) -> tuple[float, float] | None:
 
 
 TURBO_INTERVAL_FLOOR = 30.0  # never poll faster than this, even in a drop window
+SUPPORTED_MATCH_KEYS = {"set", "retailer"}
 
 
 def _match_drop_window(window, product: Product, now: datetime) -> tuple[float, float] | None:
@@ -249,8 +250,11 @@ def _match_drop_window(window, product: Product, now: datetime) -> tuple[float, 
     except ValueError as exc:
         log.warning("bad drop_window date (%r); skipping: %s", window, exc)
         return None
-    if not isinstance(match, dict) or not match:
-        log.warning("drop_window match must be a non-empty object (%r); skipping", window)
+    if not isinstance(match, dict) or not match or not set(match) <= SUPPORTED_MATCH_KEYS:
+        log.warning(
+            "drop_window match must be a non-empty object using only %s (%r); skipping",
+            SUPPORTED_MATCH_KEYS, window,
+        )
         return None
     if not (start <= now < end):
         return None
@@ -258,12 +262,12 @@ def _match_drop_window(window, product: Product, now: datetime) -> tuple[float, 
         return None
     if "retailer" in match and product.retailer != match["retailer"]:
         return None
-    return _parse_interval_range(interval, "drop_window.interval")
+    return _parse_interval_range(interval, f"drop_window[{window.get('label', '?')}].interval")
 
 
 def _active_turbo_interval(product: Product, config: dict, now: datetime) -> tuple[float, float] | None:
-    """Shortest matching drop-window turbo interval for `product` at `now`, or
-    None if no window is active/matching."""
+    """Matching drop-window turbo interval for `product` at `now` with the
+    tightest upper bound, or None if no window is active/matching."""
     windows = config.get("drop_windows")
     if not isinstance(windows, list):
         return None
