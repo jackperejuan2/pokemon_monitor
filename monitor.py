@@ -228,7 +228,65 @@ def _parse_interval_range(raw, label: str) -> tuple[float, float] | None:
         return None
 
 
-def check_interval(product: Product, config: dict, health: RetailerHealth) -> float:
+TURBO_INTERVAL_FLOOR = 30.0  # never poll faster than this, even in a drop window
+
+
+def _match_drop_window(window, product: Product, now: datetime) -> tuple[float, float] | None:
+    """Return (low, high) turbo seconds if `product` matches `window` and `now`
+    falls inside it; else None. Malformed windows are logged and skipped so a
+    bad config entry can never crash the loop."""
+    if not isinstance(window, dict):
+        log.warning("bad drop_window (%r); skipping", window)
+        return None
+    try:
+        start = datetime.fromisoformat(window["start"])
+        end = datetime.fromisoformat(window["end"])
+        match = window["match"]
+        interval = window["interval"]
+    except (KeyError, TypeError) as exc:
+        log.warning("bad drop_window (%r); skipping: %s", window, exc)
+        return None
+    except ValueError as exc:
+        log.warning("bad drop_window date (%r); skipping: %s", window, exc)
+        return None
+    if not isinstance(match, dict) or not match:
+        log.warning("drop_window match must be a non-empty object (%r); skipping", window)
+        return None
+    if not (start <= now < end):
+        return None
+    if "set" in match and product.set_name != match["set"]:
+        return None
+    if "retailer" in match and product.retailer != match["retailer"]:
+        return None
+    return _parse_interval_range(interval, "drop_window.interval")
+
+
+def _active_turbo_interval(product: Product, config: dict, now: datetime) -> tuple[float, float] | None:
+    """Shortest matching drop-window turbo interval for `product` at `now`, or
+    None if no window is active/matching."""
+    windows = config.get("drop_windows")
+    if not isinstance(windows, list):
+        return None
+    best = None
+    for window in windows:
+        rng = _match_drop_window(window, product, now)
+        if rng is None:
+            continue
+        if best is None or rng[1] < best[1]:  # shortest by upper bound
+            best = rng
+    return best
+
+
+def check_interval(product: Product, config: dict, health: RetailerHealth,
+                   now: datetime | None = None) -> float:
+    if now is None:
+        now = datetime.now()
+
+    turbo = _active_turbo_interval(product, config, now)
+    if turbo is not None:
+        low, high = turbo
+        return max(random.uniform(low, high), TURBO_INTERVAL_FLOOR)
+
     low_high = None
 
     overrides = config.get("interval_overrides")

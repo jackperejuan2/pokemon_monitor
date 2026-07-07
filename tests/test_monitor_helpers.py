@@ -16,6 +16,13 @@ def product(retailer):
     return Product(name="x", retailer=retailer, url="https://x", max_price=Decimal("1"))
 
 
+def product_set(retailer, set_name):
+    return Product(
+        name="x", retailer=retailer, url="https://x",
+        max_price=Decimal("1"), set_name=set_name,
+    )
+
+
 def test_quiet_hours_inside():
     assert in_quiet_hours(datetime(2026, 7, 3, 3, 0), CONFIG)
 
@@ -251,3 +258,118 @@ def test_load_watchlist_reads_packs_and_set(tmp_path, monkeypatch):
     products = monitor.load_watchlist()
     assert products[0].packs == 9 and products[0].set_name == "151"
     assert products[1].packs == 1 and products[1].set_name == "Other"
+
+
+DROP_CONFIG = {
+    "check_interval_seconds": [120, 300],
+    "interval_overrides": {"bestbuy": [120, 300]},
+    "drop_windows": [
+        {
+            "label": "Pitch Black launch",
+            "start": "2026-07-17T08:00:00",
+            "end": "2026-07-17T14:00:00",
+            "match": {"set": "Pitch Black"},
+            "interval": [60, 120],
+        }
+    ],
+}
+INSIDE_WINDOW = datetime(2026, 7, 17, 10, 0, 0)
+OUTSIDE_WINDOW = datetime(2026, 7, 17, 15, 0, 0)
+
+
+def test_turbo_active_when_inside_window_and_set_matches():
+    h = RetailerHealth()
+    for _ in range(50):
+        val = check_interval(product_set("bestbuy", "Pitch Black"), DROP_CONFIG, h, INSIDE_WINDOW)
+        assert 60 <= val <= 120
+
+
+def test_turbo_ignored_outside_window():
+    h = RetailerHealth()
+    val = check_interval(product_set("bestbuy", "Pitch Black"), DROP_CONFIG, h, OUTSIDE_WINDOW)
+    assert 120 <= val <= 300
+
+
+def test_turbo_ignored_when_set_does_not_match():
+    h = RetailerHealth()
+    val = check_interval(product_set("bestbuy", "151"), DROP_CONFIG, h, INSIDE_WINDOW)
+    assert 120 <= val <= 300
+
+
+def test_turbo_ignores_backoff():
+    h = RetailerHealth()
+    h.backoff = 16.0
+    val = check_interval(product_set("bestbuy", "Pitch Black"), DROP_CONFIG, h, INSIDE_WINDOW)
+    assert 60 <= val <= 120
+
+
+def test_turbo_respects_floor():
+    h = RetailerHealth()
+    config = {
+        "drop_windows": [{
+            "label": "x", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+            "match": {"set": "Pitch Black"}, "interval": [5, 5],
+        }]
+    }
+    val = check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW)
+    assert val == 30.0
+
+
+def test_turbo_matches_on_retailer_key():
+    h = RetailerHealth()
+    config = {
+        "check_interval_seconds": [120, 300],
+        "drop_windows": [{
+            "label": "wm", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+            "match": {"retailer": "walmart"}, "interval": [90, 90],
+        }]
+    }
+    assert check_interval(product_set("walmart", "151"), config, h, INSIDE_WINDOW) == 90.0
+    assert 120 <= check_interval(product_set("bestbuy", "151"), config, h, INSIDE_WINDOW) <= 300
+
+
+def test_turbo_requires_all_match_keys():
+    h = RetailerHealth()
+    config = {
+        "check_interval_seconds": [120, 300],
+        "drop_windows": [{
+            "label": "both", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+            "match": {"set": "Pitch Black", "retailer": "walmart"}, "interval": [90, 90],
+        }]
+    }
+    assert check_interval(product_set("walmart", "Pitch Black"), config, h, INSIDE_WINDOW) == 90.0
+    assert 120 <= check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW) <= 300
+
+
+def test_turbo_shortest_window_wins():
+    h = RetailerHealth()
+    config = {
+        "drop_windows": [
+            {"label": "a", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+             "match": {"set": "Pitch Black"}, "interval": [200, 200]},
+            {"label": "b", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+             "match": {"set": "Pitch Black"}, "interval": [90, 90]},
+        ]
+    }
+    assert check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW) == 90.0
+
+
+def test_turbo_malformed_window_skipped():
+    h = RetailerHealth()
+    config = {
+        "check_interval_seconds": [120, 300],
+        "drop_windows": [
+            {"label": "no-match", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+             "match": {}, "interval": [90, 90]},
+            {"label": "bad-date", "start": "not-a-date", "end": "x",
+             "match": {"set": "Pitch Black"}, "interval": [90, 90]},
+            "not-a-dict",
+        ],
+    }
+    val = check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW)
+    assert 120 <= val <= 300
+
+
+def test_check_interval_now_defaults_to_wall_clock():
+    h = RetailerHealth()
+    assert 120 <= check_interval(product("bestbuy"), CONFIG, h) <= 300
