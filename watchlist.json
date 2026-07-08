@@ -358,6 +358,54 @@
       "max_price": 160.0,
       "set": "Journey Together",
       "packs": 36
+    },
+    {
+      "name": "Chaos Rising Booster Box (36 packs)",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolution-Chaos-Rising-Booster-Box/5U7RSO9XHX7Q",
+      "max_price": 160.0,
+      "set": "Chaos Rising",
+      "packs": 36
+    },
+    {
+      "name": "Chaos Rising Elite Trainer Box",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-Trading-Card-Game-Mega-Evolution-Chaos-Rising-Elite-Trainer-Box/5XT2AUH59V49",
+      "max_price": 90.0,
+      "set": "Chaos Rising",
+      "packs": 9
+    },
+    {
+      "name": "Perfect Order Booster Box (36 packs)",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolution-Perfect-Order-Booster-Box-36-Packs/4VP8JA4Z5NTC",
+      "max_price": 160.0,
+      "set": "Perfect Order",
+      "packs": 36
+    },
+    {
+      "name": "Perfect Order Elite Trainer Box",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pok-mon-TCG-Mega-Evolution-Perfect-Order-Elite-Trainer-Box/1S28YDYAT4HK",
+      "max_price": 90.0,
+      "set": "Perfect Order",
+      "packs": 9
+    },
+    {
+      "name": "Mega Evolution (base) Booster Box (36 packs)",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolution-Booster-Display-Box-36-Packs/5E0H70UZV5RD",
+      "max_price": 160.0,
+      "set": "Mega Evolution (base)",
+      "packs": 36
+    },
+    {
+      "name": "Mega Evolution (base) Elite Trainer Box (Mega Lucario ex)",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolution-Elite-Trainer-Box-Lucario-EX/0RDE4M0HTKPS",
+      "max_price": 90.0,
+      "set": "Mega Evolution (base)",
+      "packs": 9
     }
   ]
 }

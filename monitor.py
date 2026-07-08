@@ -165,11 +165,15 @@ class RetailerHealth:
             return True
         return False
 
-    def record_success(self) -> None:
+    def record_success(self) -> bool:
+        """Returns True if this success ends a blocked episode (caller may post a
+        recovery notice)."""
+        was_blocked = self.warned_blocked
         self.backoff = 1.0
         self.consecutive_errors = 0
         self.warned_blocked = False
         self.warned_errors = False
+        return was_blocked
 
 
 def load_config() -> dict:
@@ -228,7 +232,78 @@ def _parse_interval_range(raw, label: str) -> tuple[float, float] | None:
         return None
 
 
-def check_interval(product: Product, config: dict, health: RetailerHealth) -> float:
+TURBO_INTERVAL_FLOOR = 30.0  # never poll faster than this, even in a drop window
+SUPPORTED_MATCH_KEYS = {"set", "retailer"}
+
+
+def _match_drop_window(window, product: Product, now: datetime) -> tuple[float, float] | None:
+    """Return (low, high) turbo seconds if `product` matches `window` and `now`
+    falls inside it; else None. Malformed windows are logged and skipped so a
+    bad config entry can never crash the loop."""
+    if not isinstance(window, dict):
+        log.warning("bad drop_window (%r); skipping", window)
+        return None
+    try:
+        start = datetime.fromisoformat(window["start"])
+        end = datetime.fromisoformat(window["end"])
+        match = window["match"]
+        interval = window["interval"]
+    except (KeyError, TypeError) as exc:
+        log.warning("bad drop_window (%r); skipping: %s", window, exc)
+        return None
+    except ValueError as exc:
+        log.warning("bad drop_window date (%r); skipping: %s", window, exc)
+        return None
+    if not isinstance(match, dict) or not match or not set(match) <= SUPPORTED_MATCH_KEYS:
+        log.warning(
+            "drop_window match must be a non-empty object using only %s (%r); skipping",
+            SUPPORTED_MATCH_KEYS, window,
+        )
+        return None
+    if not (start <= now < end):
+        return None
+    if "set" in match and product.set_name != match["set"]:
+        return None
+    if "retailer" in match and product.retailer != match["retailer"]:
+        return None
+    return _parse_interval_range(interval, f"drop_window[{window.get('label', '?')}].interval")
+
+
+def _active_turbo_interval(product: Product, config: dict, now: datetime) -> tuple[float, float] | None:
+    """Matching drop-window turbo interval for `product` at `now` with the
+    tightest upper bound, or None if no window is active/matching."""
+    windows = config.get("drop_windows")
+    if not isinstance(windows, list):
+        return None
+    best = None
+    for window in windows:
+        rng = _match_drop_window(window, product, now)
+        if rng is None:
+            continue
+        if best is None or rng[1] < best[1]:  # shortest by upper bound
+            best = rng
+    return best
+
+
+def _skip_for_quiet_hours(product: Product, config: dict, now: datetime, quiet: bool) -> bool:
+    """During quiet hours we normally check nothing, EXCEPT products in an active
+    drop window — a seeded drop is an explicit 'this matters now' signal that
+    overrides quiet hours."""
+    if not quiet:
+        return False
+    return _active_turbo_interval(product, config, now) is None
+
+
+def check_interval(product: Product, config: dict, health: RetailerHealth,
+                   now: datetime | None = None) -> float:
+    if now is None:
+        now = datetime.now()
+
+    turbo = _active_turbo_interval(product, config, now)
+    if turbo is not None:
+        low, high = turbo
+        return max(random.uniform(low, high), TURBO_INTERVAL_FLOOR)
+
     low_high = None
 
     overrides = config.get("interval_overrides")
@@ -274,7 +349,10 @@ async def process_product(client, notifier, product, states, records, health) ->
             )
         return False
 
-    h.record_success()
+    if h.record_success():
+        await notifier.send(
+            build_system_embed(f"**{product.retailer}** checks recovered — visibility restored.")
+        )
     now = datetime.now()
     prev = states.get(product.key, ProductState())
     decision = decide(prev, result, product, now)
@@ -355,25 +433,26 @@ async def run():
 
                 quiet = in_quiet_hours(now, config)
                 dirty = False
-                if not quiet:
-                    for product in products:
-                        if stop.is_set():
-                            break
-                        if now < next_check.get(product.key, now):
-                            continue
-                        try:
-                            changed = await asyncio.wait_for(
-                                process_product(client, notifier, product, states, records, health),
-                                timeout=180,
-                            )
-                            dirty = dirty or bool(changed)
-                        except asyncio.TimeoutError:
-                            log.warning("check timed out for %s", product.key)
-                        next_check[product.key] = datetime.now() + timedelta(
-                            seconds=check_interval(product, config, health[product.retailer])
+                for product in products:
+                    if stop.is_set():
+                        break
+                    if _skip_for_quiet_hours(product, config, now, quiet):
+                        continue
+                    if now < next_check.get(product.key, now):
+                        continue
+                    try:
+                        changed = await asyncio.wait_for(
+                            process_product(client, notifier, product, states, records, health),
+                            timeout=180,
                         )
-                        await asyncio.sleep(random.uniform(2, 8))  # spread checks out
-                        now = datetime.now()
+                        dirty = dirty or bool(changed)
+                    except asyncio.TimeoutError:
+                        log.warning("check timed out for %s", product.key)
+                    next_check[product.key] = datetime.now() + timedelta(
+                        seconds=check_interval(product, config, health[product.retailer], now)
+                    )
+                    await asyncio.sleep(random.uniform(2, 8))  # spread checks out
+                    now = datetime.now()
 
                 now2 = datetime.now()
                 minutes_since = 999.0 if last_publish is None else (now2 - last_publish).total_seconds() / 60.0

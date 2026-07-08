@@ -1,9 +1,11 @@
+import asyncio
 import json
+from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 
 from adapters.base import Product
-from monitor import RetailerHealth, check_interval, in_quiet_hours
+from monitor import RetailerHealth, _skip_for_quiet_hours, check_interval, in_quiet_hours
 
 CONFIG = {
     "check_interval_seconds": [120, 300],
@@ -14,6 +16,13 @@ CONFIG = {
 
 def product(retailer):
     return Product(name="x", retailer=retailer, url="https://x", max_price=Decimal("1"))
+
+
+def product_set(retailer, set_name):
+    return Product(
+        name="x", retailer=retailer, url="https://x",
+        max_price=Decimal("1"), set_name=set_name,
+    )
 
 
 def test_quiet_hours_inside():
@@ -73,6 +82,14 @@ def test_success_resets_health():
     assert h.backoff == 1.0
     assert h.consecutive_errors == 0
     assert h.record_blocked() is True  # warning re-armed after recovery
+
+
+def test_record_success_reports_recovery_once():
+    h = RetailerHealth()
+    assert h.record_success() is False        # was never blocked
+    h.record_blocked()                        # now blocked
+    assert h.record_success() is True         # first success after block -> recovered
+    assert h.record_success() is False        # subsequent successes are quiet
 
 
 def test_check_interval_bad_shape_falls_back():
@@ -251,3 +268,182 @@ def test_load_watchlist_reads_packs_and_set(tmp_path, monkeypatch):
     products = monitor.load_watchlist()
     assert products[0].packs == 9 and products[0].set_name == "151"
     assert products[1].packs == 1 and products[1].set_name == "Other"
+
+
+DROP_CONFIG = {
+    "check_interval_seconds": [120, 300],
+    "interval_overrides": {"bestbuy": [120, 300]},
+    "drop_windows": [
+        {
+            "label": "Pitch Black launch",
+            "start": "2026-07-17T08:00:00",
+            "end": "2026-07-17T14:00:00",
+            "match": {"set": "Pitch Black"},
+            "interval": [60, 120],
+        }
+    ],
+}
+INSIDE_WINDOW = datetime(2026, 7, 17, 10, 0, 0)
+OUTSIDE_WINDOW = datetime(2026, 7, 17, 15, 0, 0)
+
+
+def test_turbo_active_when_inside_window_and_set_matches():
+    h = RetailerHealth()
+    for _ in range(50):
+        val = check_interval(product_set("bestbuy", "Pitch Black"), DROP_CONFIG, h, INSIDE_WINDOW)
+        assert 60 <= val <= 120
+
+
+def test_turbo_ignored_outside_window():
+    h = RetailerHealth()
+    val = check_interval(product_set("bestbuy", "Pitch Black"), DROP_CONFIG, h, OUTSIDE_WINDOW)
+    assert 120 <= val <= 300
+
+
+def test_turbo_ignored_when_set_does_not_match():
+    h = RetailerHealth()
+    val = check_interval(product_set("bestbuy", "151"), DROP_CONFIG, h, INSIDE_WINDOW)
+    assert 120 <= val <= 300
+
+
+def test_turbo_ignores_backoff():
+    h = RetailerHealth()
+    h.backoff = 16.0
+    val = check_interval(product_set("bestbuy", "Pitch Black"), DROP_CONFIG, h, INSIDE_WINDOW)
+    assert 60 <= val <= 120
+
+
+def test_turbo_respects_floor():
+    h = RetailerHealth()
+    config = {
+        "drop_windows": [{
+            "label": "x", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+            "match": {"set": "Pitch Black"}, "interval": [5, 5],
+        }]
+    }
+    val = check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW)
+    assert val == 30.0
+
+
+def test_turbo_matches_on_retailer_key():
+    h = RetailerHealth()
+    config = {
+        "check_interval_seconds": [120, 300],
+        "drop_windows": [{
+            "label": "wm", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+            "match": {"retailer": "walmart"}, "interval": [90, 90],
+        }]
+    }
+    assert check_interval(product_set("walmart", "151"), config, h, INSIDE_WINDOW) == 90.0
+    assert 120 <= check_interval(product_set("bestbuy", "151"), config, h, INSIDE_WINDOW) <= 300
+
+
+def test_turbo_requires_all_match_keys():
+    h = RetailerHealth()
+    config = {
+        "check_interval_seconds": [120, 300],
+        "drop_windows": [{
+            "label": "both", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+            "match": {"set": "Pitch Black", "retailer": "walmart"}, "interval": [90, 90],
+        }]
+    }
+    assert check_interval(product_set("walmart", "Pitch Black"), config, h, INSIDE_WINDOW) == 90.0
+    assert 120 <= check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW) <= 300
+
+
+def test_turbo_shortest_window_wins():
+    h = RetailerHealth()
+    config = {
+        "drop_windows": [
+            {"label": "a", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+             "match": {"set": "Pitch Black"}, "interval": [200, 200]},
+            {"label": "b", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+             "match": {"set": "Pitch Black"}, "interval": [90, 90]},
+        ]
+    }
+    assert check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW) == 90.0
+
+
+def test_turbo_malformed_window_skipped():
+    h = RetailerHealth()
+    config = {
+        "check_interval_seconds": [120, 300],
+        "drop_windows": [
+            {"label": "no-match", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+             "match": {}, "interval": [90, 90]},
+            {"label": "bad-date", "start": "not-a-date", "end": "x",
+             "match": {"set": "Pitch Black"}, "interval": [90, 90]},
+            "not-a-dict",
+        ],
+    }
+    val = check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW)
+    assert 120 <= val <= 300
+
+
+def test_turbo_unsupported_match_key_skipped():
+    # A typo'd/unsupported match key must NOT match every product; the window
+    # is malformed and we fall back to the normal tier.
+    h = RetailerHealth()
+    config = {
+        "check_interval_seconds": [120, 300],
+        "drop_windows": [{
+            "label": "typo", "start": "2026-07-17T08:00:00", "end": "2026-07-17T14:00:00",
+            "match": {"st": "Pitch Black"}, "interval": [90, 90],
+        }],
+    }
+    val = check_interval(product_set("bestbuy", "Pitch Black"), config, h, INSIDE_WINDOW)
+    assert 120 <= val <= 300
+
+
+def test_check_interval_now_defaults_to_wall_clock():
+    h = RetailerHealth()
+    assert 120 <= check_interval(product("bestbuy"), CONFIG, h) <= 300
+
+
+def test_skip_for_quiet_hours_false_when_not_quiet():
+    assert _skip_for_quiet_hours(product("bestbuy"), {}, INSIDE_WINDOW, False) is False
+
+
+def test_skip_for_quiet_hours_true_when_quiet_and_no_window():
+    assert _skip_for_quiet_hours(product("bestbuy"), {}, INSIDE_WINDOW, True) is True
+
+
+def test_skip_for_quiet_hours_exempts_active_drop_window():
+    # quiet, but the product matches an active drop window -> must NOT skip
+    assert _skip_for_quiet_hours(
+        product_set("bestbuy", "Pitch Black"), DROP_CONFIG, INSIDE_WINDOW, True
+    ) is False
+
+
+def test_recovery_notice_sent_after_block_then_success(monkeypatch):
+    import monitor
+    from adapters import ADAPTERS
+    from adapters.base import Status, StockResult, Blocked
+
+    class FlakyAdapter:
+        def __init__(self):
+            self.calls = 0
+        async def check(self, client, prod):
+            self.calls += 1
+            if self.calls == 1:
+                raise Blocked("blocked once")
+            return StockResult(status=Status.OUT_OF_STOCK)
+
+    class FakeNotifier:
+        def __init__(self):
+            self.sent = []
+        async def send(self, embed):
+            self.sent.append(embed)
+
+    monkeypatch.setitem(ADAPTERS, "flaky", FlakyAdapter())
+    monkeypatch.setattr(monitor, "save_state", lambda s: None)
+    monkeypatch.setattr(monitor, "save_records", lambda r: None)
+
+    notifier = FakeNotifier()
+    states, records = {}, {}
+    health = defaultdict(RetailerHealth)
+    prod = product("flaky")
+    asyncio.run(monitor.process_product(None, notifier, prod, states, records, health))  # blocked
+    asyncio.run(monitor.process_product(None, notifier, prod, states, records, health))  # recovers
+    blob = " ".join((e.get("title", "") + " " + e.get("description", "")) for e in notifier.sent)
+    assert "recovered" in blob.lower()
