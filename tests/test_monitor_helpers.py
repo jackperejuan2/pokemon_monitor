@@ -1,9 +1,11 @@
+import asyncio
 import json
+from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 
 from adapters.base import Product
-from monitor import RetailerHealth, check_interval, in_quiet_hours
+from monitor import RetailerHealth, _skip_for_quiet_hours, check_interval, in_quiet_hours
 
 CONFIG = {
     "check_interval_seconds": [120, 300],
@@ -396,3 +398,52 @@ def test_turbo_unsupported_match_key_skipped():
 def test_check_interval_now_defaults_to_wall_clock():
     h = RetailerHealth()
     assert 120 <= check_interval(product("bestbuy"), CONFIG, h) <= 300
+
+
+def test_skip_for_quiet_hours_false_when_not_quiet():
+    assert _skip_for_quiet_hours(product("bestbuy"), {}, INSIDE_WINDOW, False) is False
+
+
+def test_skip_for_quiet_hours_true_when_quiet_and_no_window():
+    assert _skip_for_quiet_hours(product("bestbuy"), {}, INSIDE_WINDOW, True) is True
+
+
+def test_skip_for_quiet_hours_exempts_active_drop_window():
+    # quiet, but the product matches an active drop window -> must NOT skip
+    assert _skip_for_quiet_hours(
+        product_set("bestbuy", "Pitch Black"), DROP_CONFIG, INSIDE_WINDOW, True
+    ) is False
+
+
+def test_recovery_notice_sent_after_block_then_success(monkeypatch):
+    import monitor
+    from adapters import ADAPTERS
+    from adapters.base import Status, StockResult, Blocked
+
+    class FlakyAdapter:
+        def __init__(self):
+            self.calls = 0
+        async def check(self, client, prod):
+            self.calls += 1
+            if self.calls == 1:
+                raise Blocked("blocked once")
+            return StockResult(status=Status.OUT_OF_STOCK)
+
+    class FakeNotifier:
+        def __init__(self):
+            self.sent = []
+        async def send(self, embed):
+            self.sent.append(embed)
+
+    monkeypatch.setitem(ADAPTERS, "flaky", FlakyAdapter())
+    monkeypatch.setattr(monitor, "save_state", lambda s: None)
+    monkeypatch.setattr(monitor, "save_records", lambda r: None)
+
+    notifier = FakeNotifier()
+    states, records = {}, {}
+    health = defaultdict(RetailerHealth)
+    prod = product("flaky")
+    asyncio.run(monitor.process_product(None, notifier, prod, states, records, health))  # blocked
+    asyncio.run(monitor.process_product(None, notifier, prod, states, records, health))  # recovers
+    blob = " ".join((e.get("title", "") + " " + e.get("description", "")) for e in notifier.sent)
+    assert "recovered" in blob.lower()

@@ -285,6 +285,15 @@ def _active_turbo_interval(product: Product, config: dict, now: datetime) -> tup
     return best
 
 
+def _skip_for_quiet_hours(product: Product, config: dict, now: datetime, quiet: bool) -> bool:
+    """During quiet hours we normally check nothing, EXCEPT products in an active
+    drop window — a seeded drop is an explicit 'this matters now' signal that
+    overrides quiet hours."""
+    if not quiet:
+        return False
+    return _active_turbo_interval(product, config, now) is None
+
+
 def check_interval(product: Product, config: dict, health: RetailerHealth,
                    now: datetime | None = None) -> float:
     if now is None:
@@ -424,25 +433,26 @@ async def run():
 
                 quiet = in_quiet_hours(now, config)
                 dirty = False
-                if not quiet:
-                    for product in products:
-                        if stop.is_set():
-                            break
-                        if now < next_check.get(product.key, now):
-                            continue
-                        try:
-                            changed = await asyncio.wait_for(
-                                process_product(client, notifier, product, states, records, health),
-                                timeout=180,
-                            )
-                            dirty = dirty or bool(changed)
-                        except asyncio.TimeoutError:
-                            log.warning("check timed out for %s", product.key)
-                        next_check[product.key] = datetime.now() + timedelta(
-                            seconds=check_interval(product, config, health[product.retailer], now)
+                for product in products:
+                    if stop.is_set():
+                        break
+                    if _skip_for_quiet_hours(product, config, now, quiet):
+                        continue
+                    if now < next_check.get(product.key, now):
+                        continue
+                    try:
+                        changed = await asyncio.wait_for(
+                            process_product(client, notifier, product, states, records, health),
+                            timeout=180,
                         )
-                        await asyncio.sleep(random.uniform(2, 8))  # spread checks out
-                        now = datetime.now()
+                        dirty = dirty or bool(changed)
+                    except asyncio.TimeoutError:
+                        log.warning("check timed out for %s", product.key)
+                    next_check[product.key] = datetime.now() + timedelta(
+                        seconds=check_interval(product, config, health[product.retailer], now)
+                    )
+                    await asyncio.sleep(random.uniform(2, 8))  # spread checks out
+                    now = datetime.now()
 
                 now2 = datetime.now()
                 minutes_since = 999.0 if last_publish is None else (now2 - last_publish).total_seconds() / 60.0
