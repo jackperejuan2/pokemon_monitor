@@ -515,6 +515,126 @@
       "max_price": 90.0,
       "set": "Ascended Heroes",
       "packs": 9
+    },
+    {
+      "name": "Mega Evolution (base) Booster Box (36 packs)",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/939896",
+      "max_price": 160.0,
+      "set": "Mega Evolution (base)",
+      "packs": 36
+    },
+    {
+      "name": "Mega Evolution (base) Elite Trainer Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/939890/pokemon-trading-card-game-mega-evolutions-elite-trainer-box",
+      "max_price": 90.0,
+      "set": "Mega Evolution (base)",
+      "packs": 9
+    },
+    {
+      "name": "Phantasmal Flames Booster Box (36 packs)",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/941961",
+      "max_price": 160.0,
+      "set": "Phantasmal Flames",
+      "packs": 36
+    },
+    {
+      "name": "Phantasmal Flames Elite Trainer Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/941954",
+      "max_price": 90.0,
+      "set": "Phantasmal Flames",
+      "packs": 9
+    },
+    {
+      "name": "Ascended Heroes Elite Trainer Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/960535/pokemon-trading-card-game-mega-evolutions-ascended-heroes-elite-trainer-box",
+      "max_price": 90.0,
+      "set": "Ascended Heroes",
+      "packs": 9
+    },
+    {
+      "name": "Perfect Order Booster Box (36 packs)",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/962105/pokemon-trading-card-game-mega-evolution-perfect-order-booster-box",
+      "max_price": 160.0,
+      "set": "Perfect Order",
+      "packs": 36
+    },
+    {
+      "name": "Perfect Order Elite Trainer Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/962109/pokemon-trading-card-game-mega-evolution-perfect-order-elite-trainer-box",
+      "max_price": 90.0,
+      "set": "Perfect Order",
+      "packs": 9
+    },
+    {
+      "name": "Chaos Rising Booster Box (36 packs)",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/965103",
+      "max_price": 160.0,
+      "set": "Chaos Rising",
+      "packs": 36
+    },
+    {
+      "name": "Chaos Rising Elite Trainer Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/965100",
+      "max_price": 90.0,
+      "set": "Chaos Rising",
+      "packs": 9
+    },
+    {
+      "name": "Pitch Black Booster Box (36 packs)",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/967030/pokemon-trading-card-game-mega-evolution-pitch-black-booster-box",
+      "max_price": 160.0,
+      "set": "Pitch Black",
+      "packs": 36
+    },
+    {
+      "name": "Pitch Black Elite Trainer Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/967026/pokemon-trading-card-game-mega-evolution-pitch-black-elite-trainer-box",
+      "max_price": 90.0,
+      "set": "Pitch Black",
+      "packs": 9
+    },
+    {
+      "name": "Journey Together Booster Box (36 packs)",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/932369/pokemon-trading-card-game-scarlet-and-violet-journey-together-booster-box",
+      "max_price": 160.0,
+      "set": "Journey Together",
+      "packs": 36
+    },
+    {
+      "name": "Journey Together Elite Trainer Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/932366/pokemon-trading-card-game-scarlet-and-violet-journey-together-elite-trainer-box",
+      "max_price": 90.0,
+      "set": "Journey Together",
+      "packs": 9
+    },
+    {
+      "name": "Surging Sparks Booster Box (36 packs)",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Toys-Collectibles/Games/926777/pok-mon-trading-card-game-scarlet-and-violet-surging-sparks-booster-box",
+      "max_price": 160.0,
+      "set": "Surging Sparks",
+      "packs": 36
+    },
+    {
+      "name": "Surging Sparks Elite Trainer Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/926780/pok-mon-trading-card-game-scarlet-and-violet-surging-sparks-elite-trainer-box",
+      "max_price": 90.0,
+      "set": "Surging Sparks",
+      "packs": 9
     }
   ]
 }

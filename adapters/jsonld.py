@@ -90,7 +90,15 @@ def _fallback_from_markers(html: str, url: str) -> StockResult:
 class JsonLdAdapter:
     """Generic adapter for retailers whose product pages carry schema.org JSON-LD."""
 
+    def __init__(self, browser_first: bool = False) -> None:
+        self.browser_first = browser_first
+
     async def check(self, client: httpx.AsyncClient, product: Product) -> StockResult:
+        if self.browser_first:
+            # Some sites (EB Games) only expose their JSON-LD when JS-rendered;
+            # httpx returns a product-node-less page that the marker fallback
+            # misreads. Go straight to a real browser render for those.
+            return await self._check_via_browser(product)
         try:
             response = await client.get(product.url)
             raise_if_blocked(response)

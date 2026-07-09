@@ -4,8 +4,8 @@ from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 
-from adapters.base import Product
-from monitor import RetailerHealth, _skip_for_quiet_hours, check_interval, in_quiet_hours
+from adapters.base import Product, Status, StockResult
+from monitor import ProductHealth, RetailerHealth, _skip_for_quiet_hours, check_interval, in_quiet_hours, is_usable
 
 CONFIG = {
     "check_interval_seconds": [120, 300],
@@ -413,6 +413,117 @@ def test_skip_for_quiet_hours_exempts_active_drop_window():
     assert _skip_for_quiet_hours(
         product_set("bestbuy", "Pitch Black"), DROP_CONFIG, INSIDE_WINDOW, True
     ) is False
+
+
+def _res(status, title="Real Product"):
+    return StockResult(status=status, title=title)
+
+
+def test_is_usable_rules():
+    assert is_usable(_res(Status.IN_STOCK)) is True
+    assert is_usable(_res(Status.OUT_OF_STOCK)) is True
+    assert is_usable(_res(Status.UNKNOWN)) is False
+    # A known status with an empty/whitespace title is still usable — some
+    # retailers omit product markup for unavailable items (legit out_of_stock).
+    assert is_usable(_res(Status.OUT_OF_STOCK, title="")) is True
+    assert is_usable(_res(Status.IN_STOCK, title="   ")) is True
+    # Only UNKNOWN (learned nothing), regardless of title, is unusable.
+    assert is_usable(_res(Status.UNKNOWN, title="Some Title")) is False
+
+
+def test_product_health_stuck_then_recovered():
+    h = ProductHealth()
+    bad = _res(Status.UNKNOWN, title="")
+    good = _res(Status.OUT_OF_STOCK)
+    for _ in range(4):
+        assert h.record(bad, threshold=5) is None
+    assert h.record(bad, threshold=5) == "stuck"
+    assert h.record(bad, threshold=5) is None
+    assert h.record(good, threshold=5) == "recovered"
+    assert h.unusable_streak == 0
+    assert h.record(good, threshold=5) is None
+
+
+def test_product_health_usable_keeps_quiet():
+    h = ProductHealth()
+    assert h.record(_res(Status.IN_STOCK), threshold=5) is None
+    assert h.warned_stuck is False
+
+
+def test_product_health_alerts_stuck_then_recovered(monkeypatch):
+    import monitor
+    from adapters import ADAPTERS
+
+    class DeadAdapter:
+        def __init__(self):
+            self.usable = False
+        async def check(self, client, prod):
+            if self.usable:
+                return StockResult(status=Status.OUT_OF_STOCK, title="Real Product")
+            return StockResult(status=Status.UNKNOWN, title="")
+
+    adapter = DeadAdapter()
+    monkeypatch.setitem(ADAPTERS, "dead", adapter)
+    monkeypatch.setattr(monitor, "save_state", lambda s: None)
+    monkeypatch.setattr(monitor, "save_records", lambda r: None)
+
+    class FakeNotifier:
+        def __init__(self):
+            self.sent = []
+        async def send(self, embed):
+            self.sent.append(embed)
+
+    notifier = FakeNotifier()
+    states, records = {}, {}
+    health = defaultdict(RetailerHealth)
+    product_health = defaultdict(monitor.ProductHealth)
+    prod = product("dead")
+
+    for _ in range(5):
+        asyncio.run(monitor.process_product(
+            None, notifier, prod, states, records, health, product_health, 5))
+    blob = " ".join((e.get("title", "") + " " + e.get("description", "")) for e in notifier.sent)
+    assert "no usable data" in blob.lower()
+
+    adapter.usable = True
+    notifier.sent.clear()
+    asyncio.run(monitor.process_product(
+        None, notifier, prod, states, records, health, product_health, 5))
+    blob2 = " ".join((e.get("title", "") + " " + e.get("description", "")) for e in notifier.sent)
+    assert "returning usable data again" in blob2.lower()
+
+
+def test_check_once_flags_unusable(monkeypatch, capsys):
+    import monitor
+    from adapters import ADAPTERS
+
+    class Good:
+        async def check(self, c, p):
+            return StockResult(status=Status.IN_STOCK, price=Decimal("50"), title="Good Box")
+
+    class Bad:
+        async def check(self, c, p):
+            return StockResult(status=Status.UNKNOWN, title="")
+
+    async def _noop():
+        return None
+
+    monkeypatch.setitem(ADAPTERS, "good", Good())
+    monkeypatch.setitem(ADAPTERS, "bad", Bad())
+    monkeypatch.setattr(monitor, "load_watchlist", lambda: [product("good"), product("bad")])
+    monkeypatch.setattr(monitor, "shutdown_browser", _noop)
+
+    asyncio.run(monitor.check_once())
+    out = capsys.readouterr().out
+    assert "NO USABLE DATA" in out
+    assert "bad" in out
+
+
+def test_product_health_threshold_parsing():
+    from monitor import _product_health_threshold, DEFAULT_PRODUCT_HEALTH_THRESHOLD
+    assert _product_health_threshold({"product_health_threshold": 8}) == 8
+    assert _product_health_threshold({}) == DEFAULT_PRODUCT_HEALTH_THRESHOLD
+    assert _product_health_threshold({"product_health_threshold": "oops"}) == DEFAULT_PRODUCT_HEALTH_THRESHOLD
 
 
 def test_recovery_notice_sent_after_block_then_success(monkeypatch):

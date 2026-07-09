@@ -23,7 +23,7 @@ from pathlib import Path
 import httpx
 
 from adapters import ADAPTERS
-from adapters.base import DEFAULT_HEADERS, Blocked, Product
+from adapters.base import DEFAULT_HEADERS, Blocked, Product, Status
 from adapters.browser import shutdown_browser
 from notifier import (
     Notifier,
@@ -141,6 +141,41 @@ class SocketHealth:
             log.exception("could not send socket-health alert")
 
 
+def is_usable(result) -> bool:
+    """A check result carries usable data iff we determined a real stock status
+    (IN_STOCK or OUT_OF_STOCK). Only UNKNOWN means the check learned nothing.
+
+    A known out_of_stock with an empty title is still usable: some retailers
+    (e.g. EB Games) legitimately omit product/price markup for unavailable
+    items, and the dashboard renders the watchlist name anyway — so an empty
+    scraped title is not a failure and must not trip the health guard."""
+    return result.status is not Status.UNKNOWN
+
+
+class ProductHealth:
+    """Per-product 'is this SKU still returning real data' tracker. In-memory
+    and non-persisted, exactly like RetailerHealth (resets on restart)."""
+
+    def __init__(self) -> None:
+        self.unusable_streak = 0
+        self.warned_stuck = False
+
+    def record(self, result, threshold: int) -> str | None:
+        """Returns "stuck" once when the no-usable-data streak first reaches
+        `threshold`, "recovered" once when usable data returns after a stuck
+        episode, else None."""
+        if is_usable(result):
+            was_stuck = self.warned_stuck
+            self.unusable_streak = 0
+            self.warned_stuck = False
+            return "recovered" if was_stuck else None
+        self.unusable_streak += 1
+        if self.unusable_streak >= threshold and not self.warned_stuck:
+            self.warned_stuck = True
+            return "stuck"
+        return None
+
+
 class RetailerHealth:
     MAX_BACKOFF = 16.0  # x base interval; ~300s * 16 = 80 min worst case
 
@@ -230,6 +265,19 @@ def _parse_interval_range(raw, label: str) -> tuple[float, float] | None:
     except (TypeError, ValueError, IndexError, KeyError):
         log.warning("bad %s in config (%r); falling back", label, raw)
         return None
+
+
+DEFAULT_PRODUCT_HEALTH_THRESHOLD = 5
+
+
+def _product_health_threshold(config: dict) -> int:
+    raw = config.get("product_health_threshold", DEFAULT_PRODUCT_HEALTH_THRESHOLD)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        log.warning("bad product_health_threshold in config (%r); using %d",
+                    raw, DEFAULT_PRODUCT_HEALTH_THRESHOLD)
+        return DEFAULT_PRODUCT_HEALTH_THRESHOLD
 
 
 TURBO_INTERVAL_FLOOR = 30.0  # never poll faster than this, even in a drop window
@@ -330,7 +378,9 @@ def check_interval(product: Product, config: dict, health: RetailerHealth,
     return random.uniform(low, high) * health.backoff
 
 
-async def process_product(client, notifier, product, states, records, health) -> bool:
+async def process_product(client, notifier, product, states, records, health,
+                          product_health=None,
+                          health_threshold=DEFAULT_PRODUCT_HEALTH_THRESHOLD) -> bool:
     h = health[product.retailer]
     try:
         result = await ADAPTERS[product.retailer].check(client, product)
@@ -353,6 +403,20 @@ async def process_product(client, notifier, product, states, records, health) ->
         await notifier.send(
             build_system_embed(f"**{product.retailer}** checks recovered — visibility restored.")
         )
+
+    if product_health is not None:
+        ph = product_health[product.key]
+        ph_alert = ph.record(result, health_threshold)
+        if ph_alert == "stuck":
+            await notifier.send(build_system_embed(
+                f"**{product.retailer} {product.name}** has returned no usable data for "
+                f"{ph.unusable_streak} checks — possibly delisted or the page changed."
+            ))
+        elif ph_alert == "recovered":
+            await notifier.send(build_system_embed(
+                f"**{product.retailer} {product.name}** is returning usable data again."
+            ))
+
     now = datetime.now()
     prev = states.get(product.key, ProductState())
     decision = decide(prev, result, product, now)
@@ -394,6 +458,7 @@ async def run():
     records = load_records()
     last_publish = None
     health = defaultdict(RetailerHealth)
+    product_health = defaultdict(ProductHealth)
     next_check = {}
     last_heartbeat_date = None
     products = []
@@ -442,7 +507,8 @@ async def run():
                         continue
                     try:
                         changed = await asyncio.wait_for(
-                            process_product(client, notifier, product, states, records, health),
+                            process_product(client, notifier, product, states, records, health,
+                                            product_health, _product_health_threshold(config)),
                             timeout=180,
                         )
                         dirty = dirty or bool(changed)
@@ -481,6 +547,7 @@ async def run():
 
 async def check_once():
     products = load_watchlist()
+    unusable = []
     try:
         async with httpx.AsyncClient(
             headers=DEFAULT_HEADERS, follow_redirects=True, timeout=30,
@@ -491,10 +558,21 @@ async def check_once():
                     result = await ADAPTERS[product.retailer].check(client, product)
                     print(f"{product.retailer:15} {product.name[:40]:40} "
                           f"{result.status.value:13} price={result.price}")
+                    if not is_usable(result):
+                        unusable.append(f"{product.retailer} {product.name} "
+                                        f"(status={result.status.value}, title={result.title!r})")
                 except Exception as exc:
                     print(f"{product.retailer:15} {product.name[:40]:40} ERROR: {exc}")
+                    unusable.append(f"{product.retailer} {product.name} (ERROR: {exc})")
     finally:
         await shutdown_browser()
+    print()
+    if unusable:
+        print(f"!!  {len(unusable)} product(s) returned NO USABLE DATA (UNKNOWN / empty title / error):")
+        for u in unusable:
+            print("   -", u)
+    else:
+        print("OK  All products returned usable data.")
 
 
 def main():
