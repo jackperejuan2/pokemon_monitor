@@ -143,9 +143,13 @@ class SocketHealth:
 
 def is_usable(result) -> bool:
     """A check result carries usable data iff we determined a real stock status
-    AND parsed a non-empty product title. Catches both UNKNOWN and the
-    false-out_of_stock-with-empty-title failure mode."""
-    return result.status is not Status.UNKNOWN and bool((result.title or "").strip())
+    (IN_STOCK or OUT_OF_STOCK). Only UNKNOWN means the check learned nothing.
+
+    A known out_of_stock with an empty title is still usable: some retailers
+    (e.g. EB Games) legitimately omit product/price markup for unavailable
+    items, and the dashboard renders the watchlist name anyway — so an empty
+    scraped title is not a failure and must not trip the health guard."""
+    return result.status is not Status.UNKNOWN
 
 
 class ProductHealth:

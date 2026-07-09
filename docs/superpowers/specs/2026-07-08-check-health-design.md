@@ -60,9 +60,12 @@ Track, per product, a streak of consecutive "no usable data" checks and alert
 when it crosses a threshold.
 
 - **Signal — "usable data":** a `StockResult` is usable iff `status is not
-  Status.UNKNOWN` AND `result.title` is a non-empty, non-whitespace string. This
-  catches both the UNKNOWN case and the false-`out_of_stock`-with-empty-title
-  case. A pure helper `is_usable(result) -> bool`.
+  Status.UNKNOWN` (i.e. we determined IN_STOCK or OUT_OF_STOCK). A pure helper
+  `is_usable(result) -> bool`. **Note:** an empty scraped title is NOT treated as
+  unusable — some retailers (EB Games) legitimately omit product/price markup for
+  unavailable items, and the dashboard renders the watchlist name regardless, so
+  a known out_of_stock with no title is real information, not a failure. Only
+  UNKNOWN means the check learned nothing.
 - **Storage:** a new in-memory `ProductHealth` dataclass, tracked in a
   `defaultdict(ProductHealth)` keyed by `product.key` in `run()` — exactly
   mirroring the existing `health = defaultdict(RetailerHealth)`. NOT persisted:

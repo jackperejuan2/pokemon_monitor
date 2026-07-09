@@ -423,8 +423,12 @@ def test_is_usable_rules():
     assert is_usable(_res(Status.IN_STOCK)) is True
     assert is_usable(_res(Status.OUT_OF_STOCK)) is True
     assert is_usable(_res(Status.UNKNOWN)) is False
-    assert is_usable(_res(Status.OUT_OF_STOCK, title="")) is False
-    assert is_usable(_res(Status.IN_STOCK, title="   ")) is False
+    # A known status with an empty/whitespace title is still usable — some
+    # retailers omit product markup for unavailable items (legit out_of_stock).
+    assert is_usable(_res(Status.OUT_OF_STOCK, title="")) is True
+    assert is_usable(_res(Status.IN_STOCK, title="   ")) is True
+    # Only UNKNOWN (learned nothing), regardless of title, is unusable.
+    assert is_usable(_res(Status.UNKNOWN, title="Some Title")) is False
 
 
 def test_product_health_stuck_then_recovered():
