@@ -23,7 +23,7 @@ from pathlib import Path
 import httpx
 
 from adapters import ADAPTERS
-from adapters.base import DEFAULT_HEADERS, Blocked, Product
+from adapters.base import DEFAULT_HEADERS, Blocked, Product, Status
 from adapters.browser import shutdown_browser
 from notifier import (
     Notifier,
@@ -139,6 +139,37 @@ class SocketHealth:
             await notifier.send(build_system_embed(message))
         except Exception:
             log.exception("could not send socket-health alert")
+
+
+def is_usable(result) -> bool:
+    """A check result carries usable data iff we determined a real stock status
+    AND parsed a non-empty product title. Catches both UNKNOWN and the
+    false-out_of_stock-with-empty-title failure mode."""
+    return result.status is not Status.UNKNOWN and bool((result.title or "").strip())
+
+
+class ProductHealth:
+    """Per-product 'is this SKU still returning real data' tracker. In-memory
+    and non-persisted, exactly like RetailerHealth (resets on restart)."""
+
+    def __init__(self) -> None:
+        self.unusable_streak = 0
+        self.warned_stuck = False
+
+    def record(self, result, threshold: int) -> str | None:
+        """Returns "stuck" once when the no-usable-data streak first reaches
+        `threshold`, "recovered" once when usable data returns after a stuck
+        episode, else None."""
+        if is_usable(result):
+            was_stuck = self.warned_stuck
+            self.unusable_streak = 0
+            self.warned_stuck = False
+            return "recovered" if was_stuck else None
+        self.unusable_streak += 1
+        if self.unusable_streak >= threshold and not self.warned_stuck:
+            self.warned_stuck = True
+            return "stuck"
+        return None
 
 
 class RetailerHealth:

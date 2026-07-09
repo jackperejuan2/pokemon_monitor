@@ -4,8 +4,8 @@ from collections import defaultdict
 from datetime import datetime
 from decimal import Decimal
 
-from adapters.base import Product
-from monitor import RetailerHealth, _skip_for_quiet_hours, check_interval, in_quiet_hours
+from adapters.base import Product, Status, StockResult
+from monitor import ProductHealth, RetailerHealth, _skip_for_quiet_hours, check_interval, in_quiet_hours, is_usable
 
 CONFIG = {
     "check_interval_seconds": [120, 300],
@@ -413,6 +413,37 @@ def test_skip_for_quiet_hours_exempts_active_drop_window():
     assert _skip_for_quiet_hours(
         product_set("bestbuy", "Pitch Black"), DROP_CONFIG, INSIDE_WINDOW, True
     ) is False
+
+
+def _res(status, title="Real Product"):
+    return StockResult(status=status, title=title)
+
+
+def test_is_usable_rules():
+    assert is_usable(_res(Status.IN_STOCK)) is True
+    assert is_usable(_res(Status.OUT_OF_STOCK)) is True
+    assert is_usable(_res(Status.UNKNOWN)) is False
+    assert is_usable(_res(Status.OUT_OF_STOCK, title="")) is False
+    assert is_usable(_res(Status.IN_STOCK, title="   ")) is False
+
+
+def test_product_health_stuck_then_recovered():
+    h = ProductHealth()
+    bad = _res(Status.UNKNOWN, title="")
+    good = _res(Status.OUT_OF_STOCK)
+    for _ in range(4):
+        assert h.record(bad, threshold=5) is None
+    assert h.record(bad, threshold=5) == "stuck"
+    assert h.record(bad, threshold=5) is None
+    assert h.record(good, threshold=5) == "recovered"
+    assert h.unusable_streak == 0
+    assert h.record(good, threshold=5) is None
+
+
+def test_product_health_usable_keeps_quiet():
+    h = ProductHealth()
+    assert h.record(_res(Status.IN_STOCK), threshold=5) is None
+    assert h.warned_stuck is False
 
 
 def test_recovery_notice_sent_after_block_then_success(monkeypatch):
