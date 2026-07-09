@@ -406,6 +406,115 @@
       "max_price": 90.0,
       "set": "Mega Evolution (base)",
       "packs": 9
+    },
+    {
+      "name": "Journey Together Enhanced Booster Box (36 packs)",
+      "retailer": "bestbuy",
+      "sku": "19477569",
+      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-journey-together-enhanced-booster-box-36-packs-promo/19477569",
+      "max_price": 160.0,
+      "set": "Journey Together",
+      "packs": 36
+    },
+    {
+      "name": "Phantasmal Flames Booster Bundle",
+      "retailer": "bestbuy",
+      "sku": "19604164",
+      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-phantasmal-flames-booster-bundle/19604164",
+      "max_price": 60.0,
+      "set": "Phantasmal Flames",
+      "packs": 6
+    },
+    {
+      "name": "Perfect Order Elite Trainer Box",
+      "retailer": "bestbuy",
+      "sku": "19824976",
+      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-perfect-order-elite-trainer-box/19824976",
+      "max_price": 90.0,
+      "set": "Perfect Order",
+      "packs": 9
+    },
+    {
+      "name": "Chaos Rising Booster Box (36 packs)",
+      "retailer": "bestbuy",
+      "sku": "19893173",
+      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-chaos-rising-booster-box-36-packs/19893173",
+      "max_price": 160.0,
+      "set": "Chaos Rising",
+      "packs": 36
+    },
+    {
+      "name": "Pitch Black Elite Trainer Box",
+      "retailer": "bestbuy",
+      "sku": "19970479",
+      "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-pitch-black-elite-trainer/19970479",
+      "max_price": 90.0,
+      "set": "Pitch Black",
+      "packs": 9
+    },
+    {
+      "name": "151 Elite Trainer Box",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pok-mon-Trading-Card-Games-Scarlet-Violet-3-5-151-Elite-Trainer-Box/6000206892195",
+      "max_price": 90.0,
+      "set": "151",
+      "packs": 9
+    },
+    {
+      "name": "Surging Sparks Elite Trainer Box",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pok-mon-TCG-Scarlet-Violet-Surging-Sparks-Elite-Trainer-Box/6000208610306",
+      "max_price": 90.0,
+      "set": "Surging Sparks",
+      "packs": 9
+    },
+    {
+      "name": "Surging Sparks Booster Box (36 packs)",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pok-mon-TCG-Scarlet-Violet-Surging-Sparks-Booster-Display-Box/5JUUTMADTCTG",
+      "max_price": 160.0,
+      "set": "Surging Sparks",
+      "packs": 36
+    },
+    {
+      "name": "Journey Together Elite Trainer Box",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pok-mon-TCG-Scarlet-Violet-Journey-Together-Elite-Trainer-Box/3GIM8P636RR6",
+      "max_price": 90.0,
+      "set": "Journey Together",
+      "packs": 9
+    },
+    {
+      "name": "Journey Together Booster Box (36 packs)",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-Sv9-Journey-Together-Booster-Box/6S8YQEJZ8KW3",
+      "max_price": 160.0,
+      "set": "Journey Together",
+      "packs": 36
+    },
+    {
+      "name": "Phantasmal Flames Elite Trainer Box",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-Mega-Evolution-Phantasmal-Flames-Elite-Trainer-Box/3WYVW8839287",
+      "max_price": 90.0,
+      "set": "Phantasmal Flames",
+      "packs": 9
+    },
+    {
+      "name": "Phantasmal Flames Booster Box (36 packs)",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolutions-Phantasmal-Flames-Booster-Box-36-Packs/6P252NDC0SWY",
+      "max_price": 160.0,
+      "set": "Phantasmal Flames",
+      "packs": 36
+    },
+    {
+      "name": "Ascended Heroes Elite Trainer Box",
+      "retailer": "walmart",
+      "url": "https://www.walmart.ca/en/ip/Pok-mon-TCG-Mega-Evolution-Ascended-Heroes-Elite-Trainer-Box/4BBHBZPCR45Z",
+      "max_price": 90.0,
+      "set": "Ascended Heroes",
+      "packs": 9
     }
   ]
 }
