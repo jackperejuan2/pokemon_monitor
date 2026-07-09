@@ -529,6 +529,7 @@ async def run():
 
 async def check_once():
     products = load_watchlist()
+    unusable = []
     try:
         async with httpx.AsyncClient(
             headers=DEFAULT_HEADERS, follow_redirects=True, timeout=30,
@@ -539,10 +540,21 @@ async def check_once():
                     result = await ADAPTERS[product.retailer].check(client, product)
                     print(f"{product.retailer:15} {product.name[:40]:40} "
                           f"{result.status.value:13} price={result.price}")
+                    if not is_usable(result):
+                        unusable.append(f"{product.retailer} {product.name} "
+                                        f"(status={result.status.value}, title={result.title!r})")
                 except Exception as exc:
                     print(f"{product.retailer:15} {product.name[:40]:40} ERROR: {exc}")
+                    unusable.append(f"{product.retailer} {product.name} (ERROR: {exc})")
     finally:
         await shutdown_browser()
+    print()
+    if unusable:
+        print(f"!!  {len(unusable)} product(s) returned NO USABLE DATA (UNKNOWN / empty title / error):")
+        for u in unusable:
+            print("   -", u)
+    else:
+        print("OK  All products returned usable data.")
 
 
 def main():

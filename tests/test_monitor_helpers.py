@@ -489,6 +489,32 @@ def test_product_health_alerts_stuck_then_recovered(monkeypatch):
     assert "returning usable data again" in blob2.lower()
 
 
+def test_check_once_flags_unusable(monkeypatch, capsys):
+    import monitor
+    from adapters import ADAPTERS
+
+    class Good:
+        async def check(self, c, p):
+            return StockResult(status=Status.IN_STOCK, price=Decimal("50"), title="Good Box")
+
+    class Bad:
+        async def check(self, c, p):
+            return StockResult(status=Status.UNKNOWN, title="")
+
+    async def _noop():
+        return None
+
+    monkeypatch.setitem(ADAPTERS, "good", Good())
+    monkeypatch.setitem(ADAPTERS, "bad", Bad())
+    monkeypatch.setattr(monitor, "load_watchlist", lambda: [product("good"), product("bad")])
+    monkeypatch.setattr(monitor, "shutdown_browser", _noop)
+
+    asyncio.run(monitor.check_once())
+    out = capsys.readouterr().out
+    assert "NO USABLE DATA" in out
+    assert "bad" in out
+
+
 def test_recovery_notice_sent_after_block_then_success(monkeypatch):
     import monitor
     from adapters import ADAPTERS
