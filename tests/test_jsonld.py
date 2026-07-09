@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 import adapters.jsonld as jsonld_module
-from adapters.base import Blocked, Product, Status
+from adapters.base import Blocked, Product, Status, StockResult
 from adapters.jsonld import JsonLdAdapter, parse_stock_from_html
 
 IN_STOCK_HTML = """
@@ -165,3 +165,43 @@ def test_adapter_raises_blocked_when_browser_fallback_is_challenge_page(monkeypa
 
     with pytest.raises(Blocked):
         asyncio.run(main())
+
+
+def _ebg_product():
+    return Product(name="x", retailer="ebgames", url="https://x", max_price=Decimal("1"))
+
+
+def test_browser_first_skips_httpx(monkeypatch):
+    adapter = JsonLdAdapter(browser_first=True)
+
+    async def fake_browser(product):
+        return StockResult(status=Status.IN_STOCK, price=Decimal("9"), title="T", url=product.url)
+
+    monkeypatch.setattr(adapter, "_check_via_browser", fake_browser)
+
+    class Client:
+        async def get(self, url):
+            raise AssertionError("httpx must not be used when browser_first=True")
+
+    result = asyncio.run(adapter.check(Client(), _ebg_product()))
+    assert result.status is Status.IN_STOCK and result.title == "T"
+
+
+def test_default_uses_httpx_first():
+    adapter = JsonLdAdapter()  # browser_first defaults False
+    calls = []
+
+    class Resp:
+        text = "<html></html>"
+        url = "https://x"
+        status_code = 200
+        def raise_for_status(self):
+            pass
+
+    class Client:
+        async def get(self, url):
+            calls.append(url)
+            return Resp()
+
+    asyncio.run(adapter.check(Client(), _ebg_product()))
+    assert calls == ["https://x"]  # httpx path was taken

@@ -11,7 +11,7 @@ ADAPTERS: dict[str, Adapter] = {
     "walmart": WalmartAdapter(),
     "toysrus": JsonLdAdapter(),
     "indigo": JsonLdAdapter(),
-    "ebgames": JsonLdAdapter(),
+    "ebgames": JsonLdAdapter(browser_first=True),
     "costco": JsonLdAdapter(),
     "pokemoncenter": PokemonCenterAdapter(),
 }
