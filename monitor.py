@@ -263,6 +263,19 @@ def _parse_interval_range(raw, label: str) -> tuple[float, float] | None:
         return None
 
 
+DEFAULT_PRODUCT_HEALTH_THRESHOLD = 5
+
+
+def _product_health_threshold(config: dict) -> int:
+    raw = config.get("product_health_threshold", DEFAULT_PRODUCT_HEALTH_THRESHOLD)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        log.warning("bad product_health_threshold in config (%r); using %d",
+                    raw, DEFAULT_PRODUCT_HEALTH_THRESHOLD)
+        return DEFAULT_PRODUCT_HEALTH_THRESHOLD
+
+
 TURBO_INTERVAL_FLOOR = 30.0  # never poll faster than this, even in a drop window
 SUPPORTED_MATCH_KEYS = {"set", "retailer"}
 
@@ -362,7 +375,8 @@ def check_interval(product: Product, config: dict, health: RetailerHealth,
 
 
 async def process_product(client, notifier, product, states, records, health,
-                          product_health=None, health_threshold=5) -> bool:
+                          product_health=None,
+                          health_threshold=DEFAULT_PRODUCT_HEALTH_THRESHOLD) -> bool:
     h = health[product.retailer]
     try:
         result = await ADAPTERS[product.retailer].check(client, product)
@@ -391,7 +405,7 @@ async def process_product(client, notifier, product, states, records, health,
         ph_alert = ph.record(result, health_threshold)
         if ph_alert == "stuck":
             await notifier.send(build_system_embed(
-                f"⚠️ **{product.retailer} {product.name}** has returned no usable data for "
+                f"**{product.retailer} {product.name}** has returned no usable data for "
                 f"{ph.unusable_streak} checks — possibly delisted or the page changed."
             ))
         elif ph_alert == "recovered":
@@ -490,7 +504,7 @@ async def run():
                     try:
                         changed = await asyncio.wait_for(
                             process_product(client, notifier, product, states, records, health,
-                                            product_health, int(config.get("product_health_threshold", 5))),
+                                            product_health, _product_health_threshold(config)),
                             timeout=180,
                         )
                         dirty = dirty or bool(changed)

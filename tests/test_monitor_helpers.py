@@ -515,6 +515,13 @@ def test_check_once_flags_unusable(monkeypatch, capsys):
     assert "bad" in out
 
 
+def test_product_health_threshold_parsing():
+    from monitor import _product_health_threshold, DEFAULT_PRODUCT_HEALTH_THRESHOLD
+    assert _product_health_threshold({"product_health_threshold": 8}) == 8
+    assert _product_health_threshold({}) == DEFAULT_PRODUCT_HEALTH_THRESHOLD
+    assert _product_health_threshold({"product_health_threshold": "oops"}) == DEFAULT_PRODUCT_HEALTH_THRESHOLD
+
+
 def test_recovery_notice_sent_after_block_then_success(monkeypatch):
     import monitor
     from adapters import ADAPTERS
