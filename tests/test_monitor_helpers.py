@@ -446,6 +446,49 @@ def test_product_health_usable_keeps_quiet():
     assert h.warned_stuck is False
 
 
+def test_product_health_alerts_stuck_then_recovered(monkeypatch):
+    import monitor
+    from adapters import ADAPTERS
+
+    class DeadAdapter:
+        def __init__(self):
+            self.usable = False
+        async def check(self, client, prod):
+            if self.usable:
+                return StockResult(status=Status.OUT_OF_STOCK, title="Real Product")
+            return StockResult(status=Status.UNKNOWN, title="")
+
+    adapter = DeadAdapter()
+    monkeypatch.setitem(ADAPTERS, "dead", adapter)
+    monkeypatch.setattr(monitor, "save_state", lambda s: None)
+    monkeypatch.setattr(monitor, "save_records", lambda r: None)
+
+    class FakeNotifier:
+        def __init__(self):
+            self.sent = []
+        async def send(self, embed):
+            self.sent.append(embed)
+
+    notifier = FakeNotifier()
+    states, records = {}, {}
+    health = defaultdict(RetailerHealth)
+    product_health = defaultdict(monitor.ProductHealth)
+    prod = product("dead")
+
+    for _ in range(5):
+        asyncio.run(monitor.process_product(
+            None, notifier, prod, states, records, health, product_health, 5))
+    blob = " ".join((e.get("title", "") + " " + e.get("description", "")) for e in notifier.sent)
+    assert "no usable data" in blob.lower()
+
+    adapter.usable = True
+    notifier.sent.clear()
+    asyncio.run(monitor.process_product(
+        None, notifier, prod, states, records, health, product_health, 5))
+    blob2 = " ".join((e.get("title", "") + " " + e.get("description", "")) for e in notifier.sent)
+    assert "returning usable data again" in blob2.lower()
+
+
 def test_recovery_notice_sent_after_block_then_success(monkeypatch):
     import monitor
     from adapters import ADAPTERS

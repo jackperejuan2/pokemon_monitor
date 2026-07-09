@@ -361,7 +361,8 @@ def check_interval(product: Product, config: dict, health: RetailerHealth,
     return random.uniform(low, high) * health.backoff
 
 
-async def process_product(client, notifier, product, states, records, health) -> bool:
+async def process_product(client, notifier, product, states, records, health,
+                          product_health=None, health_threshold=5) -> bool:
     h = health[product.retailer]
     try:
         result = await ADAPTERS[product.retailer].check(client, product)
@@ -384,6 +385,20 @@ async def process_product(client, notifier, product, states, records, health) ->
         await notifier.send(
             build_system_embed(f"**{product.retailer}** checks recovered — visibility restored.")
         )
+
+    if product_health is not None:
+        ph = product_health[product.key]
+        ph_alert = ph.record(result, health_threshold)
+        if ph_alert == "stuck":
+            await notifier.send(build_system_embed(
+                f"⚠️ **{product.retailer} {product.name}** has returned no usable data for "
+                f"{ph.unusable_streak} checks — possibly delisted or the page changed."
+            ))
+        elif ph_alert == "recovered":
+            await notifier.send(build_system_embed(
+                f"**{product.retailer} {product.name}** is returning usable data again."
+            ))
+
     now = datetime.now()
     prev = states.get(product.key, ProductState())
     decision = decide(prev, result, product, now)
@@ -425,6 +440,7 @@ async def run():
     records = load_records()
     last_publish = None
     health = defaultdict(RetailerHealth)
+    product_health = defaultdict(ProductHealth)
     next_check = {}
     last_heartbeat_date = None
     products = []
@@ -473,7 +489,8 @@ async def run():
                         continue
                     try:
                         changed = await asyncio.wait_for(
-                            process_product(client, notifier, product, states, records, health),
+                            process_product(client, notifier, product, states, records, health,
+                                            product_health, int(config.get("product_health_threshold", 5))),
                             timeout=180,
                         )
                         dirty = dirty or bool(changed)
