@@ -183,3 +183,8 @@ def test_drop_below_min_pct():
 
 def test_drop_no_price():
     assert should_alert_price_drop(Decimal("49.98"), _drop_in_stock(None), DROP_PROD, 0.02, 1.0) is False
+
+
+def test_drop_exactly_at_thresholds_alerts():
+    # prior 50.00 -> 49.00: drop exactly $1.00 (== min_abs) and exactly 2% (== min_pct)
+    assert should_alert_price_drop(Decimal("50.00"), _drop_in_stock("49.00"), DROP_PROD, 0.02, 1.0) is True

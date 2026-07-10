@@ -400,7 +400,7 @@ def _to_decimal(s):
         return None
     try:
         return Decimal(s)
-    except (ArithmeticError, TypeError):
+    except (ArithmeticError, TypeError, ValueError):
         return None
 
 
