@@ -10,6 +10,7 @@ import logging
 import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 
 from adapters.base import Product, Status, StockResult
@@ -53,6 +54,21 @@ def decide(prev: ProductState, result: StockResult, product: Product, now: datet
     if price_ok and not prev.price_ok:
         return Decision(new, "restock")
     return Decision(new, None)
+
+
+def should_alert_price_drop(prev_lowest, result, product, min_pct, min_abs) -> bool:
+    """True iff `result` is an in-stock, buyable (<= max_price) new all-time low
+    that is at least `min_abs` AND `min_pct` below `prev_lowest`. `prev_lowest`
+    is the previously recorded lowest price (Decimal) or None (no prior low ->
+    never a drop; that first buyable sighting is handled by the restock alert)."""
+    if result.status is not Status.IN_STOCK or result.price is None:
+        return False
+    if result.price > product.max_price:
+        return False
+    if prev_lowest is None or result.price >= prev_lowest:
+        return False
+    drop = prev_lowest - result.price
+    return drop >= Decimal(str(min_abs)) and (drop / prev_lowest) >= Decimal(str(min_pct))
 
 
 def load_state() -> dict[str, ProductState]:

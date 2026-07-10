@@ -12,6 +12,7 @@ log = logging.getLogger("notifier")
 COLOR_RESTOCK = 0x2ECC71      # green
 COLOR_SYSTEM = 0xE74C3C       # red
 COLOR_INFO = 0x95A5A6         # grey
+COLOR_PRICE_DROP = 0x1ABC9C   # teal
 
 
 def build_restock_embed(product: Product, result: StockResult) -> dict:
@@ -21,6 +22,22 @@ def build_restock_embed(product: Product, result: StockResult) -> dict:
         "color": COLOR_RESTOCK,
         "description": (
             f"**${result.price:.2f} CAD** (max ${product.max_price:.2f}) at **{product.retailer}**\n"
+            f"[Buy now]({product.url})"
+        ),
+    }
+
+
+def build_price_drop_embed(product: Product, result: StockResult, prev_lowest) -> dict:
+    pct = (prev_lowest - result.price) / prev_lowest * 100
+    per_pack = (f" · ${result.price / product.packs:.2f}/pack"
+                if product.packs and product.packs > 0 else "")
+    return {
+        "title": f"📉 Price drop: {product.name}",
+        "url": product.url,
+        "color": COLOR_PRICE_DROP,
+        "description": (
+            f"**${result.price:.2f} CAD** (was ${prev_lowest:.2f}, −{pct:.0f}%)"
+            f"{per_pack} at **{product.retailer}**\n"
             f"[Buy now]({product.url})"
         ),
     }

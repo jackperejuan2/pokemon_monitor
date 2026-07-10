@@ -28,12 +28,13 @@ from adapters.browser import shutdown_browser
 from notifier import (
     Notifier,
     build_heartbeat_embed,
+    build_price_drop_embed,
     build_restock_embed,
     build_system_embed,
 )
 from dashboard import DashboardRecord, load_records, render_html, save_records, update_record
 from publisher import publish, should_publish
-from state import ProductState, decide, load_state, save_state
+from state import ProductState, decide, load_state, save_state, should_alert_price_drop
 
 BASE_DIR = Path(__file__).parent
 WATCHLIST_PATH = BASE_DIR / "watchlist.json"
@@ -280,6 +281,21 @@ def _product_health_threshold(config: dict) -> int:
         return DEFAULT_PRODUCT_HEALTH_THRESHOLD
 
 
+DEFAULT_PRICE_DROP_MIN_PCT = 0.02
+DEFAULT_PRICE_DROP_MIN_ABS = 1.0
+
+
+def _config_float(config: dict, key: str, default: float) -> float:
+    """Read a float config value, falling back to `default` (with a warning) on a
+    missing or non-numeric value — a bad config edit must not crash the daemon."""
+    raw = config.get(key, default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        log.warning("bad %s in config (%r); using %s", key, raw, default)
+        return default
+
+
 TURBO_INTERVAL_FLOOR = 30.0  # never poll faster than this, even in a drop window
 SUPPORTED_MATCH_KEYS = {"set", "retailer"}
 
@@ -378,9 +394,20 @@ def check_interval(product: Product, config: dict, health: RetailerHealth,
     return random.uniform(low, high) * health.backoff
 
 
+def _to_decimal(s):
+    """Parse a stringified Decimal to Decimal, or None if missing/malformed."""
+    if s is None:
+        return None
+    try:
+        return Decimal(s)
+    except (ArithmeticError, TypeError, ValueError):
+        return None
+
+
 async def process_product(client, notifier, product, states, records, health,
-                          product_health=None,
-                          health_threshold=DEFAULT_PRODUCT_HEALTH_THRESHOLD) -> bool:
+                          product_health=None, health_threshold=DEFAULT_PRODUCT_HEALTH_THRESHOLD,
+                          price_drop_min_pct=DEFAULT_PRICE_DROP_MIN_PCT,
+                          price_drop_min_abs=DEFAULT_PRICE_DROP_MIN_ABS) -> bool:
     h = health[product.retailer]
     try:
         result = await ADAPTERS[product.retailer].check(client, product)
@@ -426,7 +453,9 @@ async def process_product(client, notifier, product, states, records, health,
     except Exception:
         log.exception("could not persist state")
 
-    new_rec, changed = update_record(records.get(product.key, DashboardRecord()), result, now)
+    prev_rec = records.get(product.key, DashboardRecord())
+    prior_lowest = _to_decimal(prev_rec.lowest_price)
+    new_rec, changed = update_record(prev_rec, result, now)
     records[product.key] = new_rec
     if changed:
         try:
@@ -441,6 +470,8 @@ async def process_product(client, notifier, product, states, records, health,
              decision.alert, result.title)
     if decision.alert == "restock":
         await notifier.send(build_restock_embed(product, result))
+    elif should_alert_price_drop(prior_lowest, result, product, price_drop_min_pct, price_drop_min_abs):
+        await notifier.send(build_price_drop_embed(product, result, prior_lowest))
     return changed
 
 
@@ -508,7 +539,9 @@ async def run():
                     try:
                         changed = await asyncio.wait_for(
                             process_product(client, notifier, product, states, records, health,
-                                            product_health, _product_health_threshold(config)),
+                                            product_health, _product_health_threshold(config),
+                                            _config_float(config, "price_drop_min_pct", DEFAULT_PRICE_DROP_MIN_PCT),
+                                            _config_float(config, "price_drop_min_abs", DEFAULT_PRICE_DROP_MIN_ABS)),
                             timeout=180,
                         )
                         dirty = dirty or bool(changed)
