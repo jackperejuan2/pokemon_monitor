@@ -526,6 +526,13 @@ def test_product_health_threshold_parsing():
     assert _product_health_threshold({"product_health_threshold": "oops"}) == DEFAULT_PRODUCT_HEALTH_THRESHOLD
 
 
+def test_config_float_parsing():
+    from monitor import _config_float
+    assert _config_float({"k": 0.05}, "k", 0.02) == 0.05
+    assert _config_float({}, "k", 0.02) == 0.02
+    assert _config_float({"k": "oops"}, "k", 0.02) == 0.02
+
+
 def test_recovery_notice_sent_after_block_then_success(monkeypatch):
     import monitor
     from adapters import ADAPTERS

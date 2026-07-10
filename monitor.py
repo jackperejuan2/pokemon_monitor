@@ -280,6 +280,21 @@ def _product_health_threshold(config: dict) -> int:
         return DEFAULT_PRODUCT_HEALTH_THRESHOLD
 
 
+DEFAULT_PRICE_DROP_MIN_PCT = 0.02
+DEFAULT_PRICE_DROP_MIN_ABS = 1.0
+
+
+def _config_float(config: dict, key: str, default: float) -> float:
+    """Read a float config value, falling back to `default` (with a warning) on a
+    missing or non-numeric value — a bad config edit must not crash the daemon."""
+    raw = config.get(key, default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        log.warning("bad %s in config (%r); using %s", key, raw, default)
+        return default
+
+
 TURBO_INTERVAL_FLOOR = 30.0  # never poll faster than this, even in a drop window
 SUPPORTED_MATCH_KEYS = {"set", "retailer"}
 
