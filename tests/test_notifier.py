@@ -7,10 +7,12 @@ import httpx
 from adapters.base import Product, Status, StockResult
 from notifier import (
     COLOR_INFO,
+    COLOR_PRICE_DROP,
     COLOR_RESTOCK,
     COLOR_SYSTEM,
     Notifier,
     build_heartbeat_embed,
+    build_price_drop_embed,
     build_restock_embed,
     build_system_embed,
 )
@@ -30,6 +32,16 @@ def test_restock_embed():
     assert "64.99" in embed["description"]
 
 
+
+
+def test_price_drop_embed():
+    result = StockResult(status=Status.IN_STOCK, price=Decimal("42.48"))
+    embed = build_price_drop_embed(PRODUCT, result, Decimal("49.98"))
+    assert embed["color"] == COLOR_PRICE_DROP
+    assert "Price drop" in embed["title"]
+    assert embed["url"] == PRODUCT.url
+    assert "42.48" in embed["description"]
+    assert "49.98" in embed["description"]
 
 
 def test_system_embed():
