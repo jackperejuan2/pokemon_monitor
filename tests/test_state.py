@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from adapters.base import Product, Status, StockResult
-from state import ProductState, decide
+from state import ProductState, decide, should_alert_price_drop
 
 NOW = datetime(2026, 7, 3, 12, 0, 0)
 PRODUCT = Product(
@@ -136,3 +136,50 @@ def test_price_jump_over_max_goes_quiet_and_resets_price_ok():
     d = decide(prev, in_stock("89.99"), PRODUCT, NOW)
     assert d.alert is None
     assert d.new_state.price_ok is False
+
+
+DROP_PROD = Product(name="Bundle", retailer="walmart", url="https://x",
+                    max_price=Decimal("60"), packs=6)
+
+
+def _drop_in_stock(price):
+    return StockResult(status=Status.IN_STOCK,
+                       price=Decimal(price) if price is not None else None)
+
+
+def test_drop_new_buyable_low_above_threshold():
+    assert should_alert_price_drop(Decimal("49.98"), _drop_in_stock("42.48"), DROP_PROD, 0.02, 1.0) is True
+
+
+def test_drop_not_a_new_low():
+    assert should_alert_price_drop(Decimal("42.48"), _drop_in_stock("45.00"), DROP_PROD, 0.02, 1.0) is False
+
+
+def test_drop_equal_to_prior_low():
+    assert should_alert_price_drop(Decimal("42.48"), _drop_in_stock("42.48"), DROP_PROD, 0.02, 1.0) is False
+
+
+def test_drop_over_max_not_buyable():
+    assert should_alert_price_drop(Decimal("80"), _drop_in_stock("65"), DROP_PROD, 0.02, 1.0) is False
+
+
+def test_drop_out_of_stock():
+    oos = StockResult(status=Status.OUT_OF_STOCK, price=Decimal("42.48"))
+    assert should_alert_price_drop(Decimal("49.98"), oos, DROP_PROD, 0.02, 1.0) is False
+
+
+def test_drop_no_prior_low():
+    assert should_alert_price_drop(None, _drop_in_stock("42.48"), DROP_PROD, 0.02, 1.0) is False
+
+
+def test_drop_below_min_abs():
+    assert should_alert_price_drop(Decimal("43.00"), _drop_in_stock("42.50"), DROP_PROD, 0.02, 1.0) is False
+
+
+def test_drop_below_min_pct():
+    big = Product(name="Box", retailer="walmart", url="https://y", max_price=Decimal("2000"), packs=36)
+    assert should_alert_price_drop(Decimal("1000"), _drop_in_stock("999"), big, 0.02, 1.0) is False
+
+
+def test_drop_no_price():
+    assert should_alert_price_drop(Decimal("49.98"), _drop_in_stock(None), DROP_PROD, 0.02, 1.0) is False
