@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from adapters.base import Product, Status, StockResult
 from monitor import ProductHealth, RetailerHealth, _skip_for_quiet_hours, check_interval, in_quiet_hours, is_usable
+from state import ProductState
 
 CONFIG = {
     "check_interval_seconds": [120, 300],
@@ -565,3 +566,64 @@ def test_recovery_notice_sent_after_block_then_success(monkeypatch):
     asyncio.run(monitor.process_product(None, notifier, prod, states, records, health))  # recovers
     blob = " ".join((e.get("title", "") + " " + e.get("description", "")) for e in notifier.sent)
     assert "recovered" in blob.lower()
+
+
+def test_process_product_fires_price_drop(monkeypatch):
+    import monitor
+    from adapters import ADAPTERS
+    from dashboard import DashboardRecord
+
+    class PriceAdapter:
+        async def check(self, c, p):
+            return StockResult(status=Status.IN_STOCK, price=Decimal("42.48"), title="Bundle")
+
+    monkeypatch.setitem(ADAPTERS, "dropt", PriceAdapter())
+    monkeypatch.setattr(monitor, "save_state", lambda s: None)
+    monkeypatch.setattr(monitor, "save_records", lambda r: None)
+
+    class FakeNotifier:
+        def __init__(self): self.sent = []
+        async def send(self, e): self.sent.append(e)
+
+    notifier = FakeNotifier()
+    prod = Product(name="Bundle", retailer="dropt", url="https://x",
+                   max_price=Decimal("60"), packs=6)
+    states = {prod.key: ProductState(status="in_stock", price_ok=True)}
+    records = {prod.key: DashboardRecord(last_price="49.98", last_status="in_stock",
+                                         lowest_price="49.98")}
+    health = defaultdict(RetailerHealth)
+    asyncio.run(monitor.process_product(None, notifier, prod, states, records, health,
+                                        None, 5, 0.02, 1.0))
+    titles = " ".join(e.get("title", "") for e in notifier.sent)
+    assert "Price drop" in titles
+
+
+def test_process_product_restock_suppresses_price_drop(monkeypatch):
+    import monitor
+    from adapters import ADAPTERS
+    from dashboard import DashboardRecord
+
+    class PriceAdapter:
+        async def check(self, c, p):
+            return StockResult(status=Status.IN_STOCK, price=Decimal("42.48"), title="Bundle")
+
+    monkeypatch.setitem(ADAPTERS, "dropt2", PriceAdapter())
+    monkeypatch.setattr(monitor, "save_state", lambda s: None)
+    monkeypatch.setattr(monitor, "save_records", lambda r: None)
+
+    class FakeNotifier:
+        def __init__(self): self.sent = []
+        async def send(self, e): self.sent.append(e)
+
+    notifier = FakeNotifier()
+    prod = Product(name="Bundle", retailer="dropt2", url="https://z",
+                   max_price=Decimal("60"), packs=6)
+    states = {prod.key: ProductState(status="out_of_stock", price_ok=False)}
+    records = {prod.key: DashboardRecord(last_price="49.98", last_status="out_of_stock",
+                                         lowest_price="49.98")}
+    health = defaultdict(RetailerHealth)
+    asyncio.run(monitor.process_product(None, notifier, prod, states, records, health,
+                                        None, 5, 0.02, 1.0))
+    titles = " ".join(e.get("title", "") for e in notifier.sent)
+    assert "RESTOCK" in titles
+    assert "Price drop" not in titles
