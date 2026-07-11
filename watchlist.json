@@ -41,7 +41,7 @@
       "retailer": "bestbuy",
       "sku": "19383002",
       "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-surging-sparks-booster-box-36-packs/19383002",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Surging Sparks",
       "packs": 36
     },
@@ -138,7 +138,7 @@
       "retailer": "bestbuy",
       "sku": "19604130",
       "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-phantasmal-flames-booster-box-36-packs/19604130",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Phantasmal Flames",
       "packs": 36
     },
@@ -156,7 +156,7 @@
       "retailer": "bestbuy",
       "sku": "19826990",
       "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-perfect-order-booster-box-36-packs/19826990",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Perfect Order",
       "packs": 36
     },
@@ -197,7 +197,7 @@
       "name": "Chaos Rising Booster Display Box (36 packs)",
       "retailer": "pokemoncenter",
       "url": "https://www.pokemoncenter.com/en-ca/product/10-10407-119/pokemon-tcg-mega-evolution-chaos-rising-booster-display-box-36-packs",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Chaos Rising",
       "packs": 36
     },
@@ -221,7 +221,7 @@
       "name": "Phantasmal Flames Booster Display Box (36 packs)",
       "retailer": "pokemoncenter",
       "url": "https://www.pokemoncenter.com/en-ca/product/10-10190-119/pokemon-tcg-mega-evolution-phantasmal-flames-booster-display-box-36-packs",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Phantasmal Flames",
       "packs": 36
     },
@@ -237,7 +237,7 @@
       "name": "Perfect Order Booster Display Box (36 packs)",
       "retailer": "pokemoncenter",
       "url": "https://www.pokemoncenter.com/en-ca/product/10-10380-119",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Perfect Order",
       "packs": 36
     },
@@ -245,7 +245,7 @@
       "name": "Pitch Black Booster Display Box (36 packs)",
       "retailer": "pokemoncenter",
       "url": "https://www.pokemoncenter.com/en-ca/product/10-10425-120/pokemon-tcg-mega-evolution-pitch-black-booster-display-box-36-packs",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Pitch Black",
       "packs": 36
     },
@@ -270,7 +270,7 @@
       "retailer": "bestbuy",
       "sku": "19586360",
       "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-base-set-booster-box/19586360",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Mega Evolution (base)",
       "packs": 36
     },
@@ -296,7 +296,7 @@
       "name": "Mega Evolution (base) Enhanced Booster Display Box (36 packs)",
       "retailer": "pokemoncenter",
       "url": "https://www.pokemoncenter.com/en-ca/product/10-10057-127/pokemon-tcg-mega-evolution-enhanced-booster-display-box-36-packs-and-1-promo-card",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Mega Evolution (base)",
       "packs": 36
     },
@@ -355,7 +355,7 @@
       "name": "Journey Together Enhanced Booster Display Box (36 packs)",
       "retailer": "pokemoncenter",
       "url": "https://www.pokemoncenter.com/en-ca/product/10-10125-102/pokemon-tcg-scarlet-and-violet-journey-together-enhanced-booster-display-box-36-packs-and-1-promo-card",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Journey Together",
       "packs": 36
     },
@@ -363,7 +363,7 @@
       "name": "Chaos Rising Booster Box (36 packs)",
       "retailer": "walmart",
       "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolution-Chaos-Rising-Booster-Box/5U7RSO9XHX7Q",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Chaos Rising",
       "packs": 36
     },
@@ -379,7 +379,7 @@
       "name": "Perfect Order Booster Box (36 packs)",
       "retailer": "walmart",
       "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolution-Perfect-Order-Booster-Box-36-Packs/4VP8JA4Z5NTC",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Perfect Order",
       "packs": 36
     },
@@ -395,7 +395,7 @@
       "name": "Mega Evolution (base) Booster Box (36 packs)",
       "retailer": "walmart",
       "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolution-Booster-Display-Box-36-Packs/5E0H70UZV5RD",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Mega Evolution (base)",
       "packs": 36
     },
@@ -412,7 +412,7 @@
       "retailer": "bestbuy",
       "sku": "19477569",
       "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-scarlet-violet-journey-together-enhanced-booster-box-36-packs-promo/19477569",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Journey Together",
       "packs": 36
     },
@@ -439,7 +439,7 @@
       "retailer": "bestbuy",
       "sku": "19893173",
       "url": "https://www.bestbuy.ca/en-ca/product/pokemon-tcg-mega-evolution-chaos-rising-booster-box-36-packs/19893173",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Chaos Rising",
       "packs": 36
     },
@@ -472,7 +472,7 @@
       "name": "Surging Sparks Booster Box (36 packs)",
       "retailer": "walmart",
       "url": "https://www.walmart.ca/en/ip/Pok-mon-TCG-Scarlet-Violet-Surging-Sparks-Booster-Display-Box/5JUUTMADTCTG",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Surging Sparks",
       "packs": 36
     },
@@ -488,7 +488,7 @@
       "name": "Journey Together Booster Box (36 packs)",
       "retailer": "walmart",
       "url": "https://www.walmart.ca/en/ip/Pokemon-Sv9-Journey-Together-Booster-Box/6S8YQEJZ8KW3",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Journey Together",
       "packs": 36
     },
@@ -504,7 +504,7 @@
       "name": "Phantasmal Flames Booster Box (36 packs)",
       "retailer": "walmart",
       "url": "https://www.walmart.ca/en/ip/Pokemon-TCG-Mega-Evolutions-Phantasmal-Flames-Booster-Box-36-Packs/6P252NDC0SWY",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Phantasmal Flames",
       "packs": 36
     },
@@ -520,7 +520,7 @@
       "name": "Mega Evolution (base) Booster Box (36 packs)",
       "retailer": "ebgames",
       "url": "https://www.ebgames.ca/Trading%20Cards/Games/939896",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Mega Evolution (base)",
       "packs": 36
     },
@@ -536,7 +536,7 @@
       "name": "Phantasmal Flames Booster Box (36 packs)",
       "retailer": "ebgames",
       "url": "https://www.ebgames.ca/Trading%20Cards/Games/941961",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Phantasmal Flames",
       "packs": 36
     },
@@ -560,7 +560,7 @@
       "name": "Perfect Order Booster Box (36 packs)",
       "retailer": "ebgames",
       "url": "https://www.ebgames.ca/Trading%20Cards/Games/962105/pokemon-trading-card-game-mega-evolution-perfect-order-booster-box",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Perfect Order",
       "packs": 36
     },
@@ -576,7 +576,7 @@
       "name": "Chaos Rising Booster Box (36 packs)",
       "retailer": "ebgames",
       "url": "https://www.ebgames.ca/Trading%20Cards/Games/965103",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Chaos Rising",
       "packs": 36
     },
@@ -592,7 +592,7 @@
       "name": "Pitch Black Booster Box (36 packs)",
       "retailer": "ebgames",
       "url": "https://www.ebgames.ca/Trading%20Cards/Games/967030/pokemon-trading-card-game-mega-evolution-pitch-black-booster-box",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Pitch Black",
       "packs": 36
     },
@@ -608,7 +608,7 @@
       "name": "Journey Together Booster Box (36 packs)",
       "retailer": "ebgames",
       "url": "https://www.ebgames.ca/Trading%20Cards/Games/932369/pokemon-trading-card-game-scarlet-and-violet-journey-together-booster-box",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Journey Together",
       "packs": 36
     },
@@ -624,7 +624,7 @@
       "name": "Surging Sparks Booster Box (36 packs)",
       "retailer": "ebgames",
       "url": "https://www.ebgames.ca/Toys-Collectibles/Games/926777/pok-mon-trading-card-game-scarlet-and-violet-surging-sparks-booster-box",
-      "max_price": 160.0,
+      "max_price": 360.0,
       "set": "Surging Sparks",
       "packs": 36
     },
