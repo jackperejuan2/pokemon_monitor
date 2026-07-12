@@ -528,6 +528,7 @@ async def run():
         ) as client:
             while not stop.is_set():
                 config = safe_reload(load_config, config, "config.json")
+                await ping_healthcheck(client, config.get("healthcheck_url"))
                 products = safe_reload(load_watchlist, products, "watchlist.json")
                 now = datetime.now()
 
