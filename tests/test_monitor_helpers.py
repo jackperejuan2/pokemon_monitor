@@ -627,3 +627,40 @@ def test_process_product_restock_suppresses_price_drop(monkeypatch):
     titles = " ".join(e.get("title", "") for e in notifier.sent)
     assert "RESTOCK" in titles
     assert "Price drop" not in titles
+
+
+def test_ping_healthcheck_noop_on_empty_url():
+    import monitor
+
+    calls = []
+
+    class Client:
+        async def get(self, url, **kw):
+            calls.append(url)
+
+    asyncio.run(monitor.ping_healthcheck(Client(), None))
+    asyncio.run(monitor.ping_healthcheck(Client(), ""))
+    assert calls == []
+
+
+def test_ping_healthcheck_gets_url():
+    import monitor
+
+    calls = []
+
+    class Client:
+        async def get(self, url, **kw):
+            calls.append(url)
+
+    asyncio.run(monitor.ping_healthcheck(Client(), "https://hc-ping.com/abc"))
+    assert calls == ["https://hc-ping.com/abc"]
+
+
+def test_ping_healthcheck_swallows_errors():
+    import monitor
+
+    class Client:
+        async def get(self, url, **kw):
+            raise RuntimeError("network down")
+
+    asyncio.run(monitor.ping_healthcheck(Client(), "https://hc-ping.com/abc"))

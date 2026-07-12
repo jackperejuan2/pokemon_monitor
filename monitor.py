@@ -296,6 +296,19 @@ def _config_float(config: dict, key: str, default: float) -> float:
         return default
 
 
+async def ping_healthcheck(client, url) -> None:
+    """Best-effort liveness ping to an external dead-man's-switch (Healthchecks.io
+    etc.). No-op when `url` is falsy. Never raises and must not meaningfully block
+    — a failed ping must not disrupt checks; the whole point is that the EXTERNAL
+    service notices the silence."""
+    if not url:
+        return
+    try:
+        await client.get(url, timeout=10)
+    except Exception as exc:
+        log.debug("healthcheck ping failed: %s", exc)
+
+
 TURBO_INTERVAL_FLOOR = 30.0  # never poll faster than this, even in a drop window
 SUPPORTED_MATCH_KEYS = {"set", "retailer"}
 
@@ -515,6 +528,7 @@ async def run():
         ) as client:
             while not stop.is_set():
                 config = safe_reload(load_config, config, "config.json")
+                await ping_healthcheck(client, config.get("healthcheck_url"))
                 products = safe_reload(load_watchlist, products, "watchlist.json")
                 now = datetime.now()
 
