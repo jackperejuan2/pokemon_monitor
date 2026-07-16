@@ -605,6 +605,30 @@
       "packs": 9
     },
     {
+      "name": "Pitch Black Booster Bundle",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/967029/pokemon-trading-card-game-mega-evolution-pitch-black-booster-bundle",
+      "max_price": 60.0,
+      "set": "Pitch Black",
+      "packs": 6
+    },
+    {
+      "name": "Pitch Black Build & Battle Box",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/967027/pokemon-trading-card-game-mega-evolution-pitch-black-build-and-battle-box",
+      "max_price": 40.0,
+      "set": "Pitch Black",
+      "packs": 4
+    },
+    {
+      "name": "Pitch Black Booster Pack",
+      "retailer": "ebgames",
+      "url": "https://www.ebgames.ca/Trading%20Cards/Games/967024/pokemon-trading-card-game-mega-evolution-pitch-black-booster-pack-one-variation-chosen-at-random",
+      "max_price": 10.0,
+      "set": "Pitch Black",
+      "packs": 1
+    },
+    {
       "name": "Journey Together Booster Box (36 packs)",
       "retailer": "ebgames",
       "url": "https://www.ebgames.ca/Trading%20Cards/Games/932369/pokemon-trading-card-game-scarlet-and-violet-journey-together-booster-box",
