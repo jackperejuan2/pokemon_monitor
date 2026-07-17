@@ -61,6 +61,31 @@ def test_finds_product_inside_graph():
     assert r.price == Decimal("59.99")
 
 
+PREORDER_HTML = """
+<html><head>
+<script type="application/ld+json">
+{"@type":"Product","name":"Pitch Black Booster Bundle",
+ "offers":{"@type":"Offer","price":"44.99","priceCurrency":"CAD",
+ "availability":"https://schema.org/PreOrder"}}
+</script>
+</head>
+<body>
+<script>var lang={outOfStock:'Out of Stock',unavailable:'Item is sold out'};</script>
+<p>add eligible pre-orders to your shopping cart using the "Add to Cart" button</p>
+</body></html>
+"""
+
+
+def test_preorder_offer_is_buyable():
+    # EB Games serves availability=PreOrder for buyable pre-orders. A pre-order
+    # with a price is purchasable now and must alert like an in-stock item --
+    # not fall through to the (boilerplate-ridden) marker fallback.
+    r = parse_stock_from_html(PREORDER_HTML, "https://ebgames.ca/p")
+    assert r.status is Status.IN_STOCK
+    assert r.price == Decimal("44.99")
+    assert r.title == "Pitch Black Booster Bundle"
+
+
 def test_fallback_out_of_stock_marker():
     assert parse_stock_from_html(NO_LDJSON_OOS_HTML).status is Status.OUT_OF_STOCK
 

@@ -60,7 +60,9 @@ def _result_from_product_node(node: dict, url: str) -> StockResult | None:
     if not isinstance(offers, dict):
         return None
     availability = str(offers.get("availability", "")).lower()
-    if "instock" in availability:
+    # PreOrder/PreSale are buyable now (reserve at the listed price), so treat
+    # them like InStock: a priced pre-order should alert, not be dismissed.
+    if "instock" in availability or "preorder" in availability or "presale" in availability:
         status = Status.IN_STOCK
     elif "outofstock" in availability or "soldout" in availability:
         status = Status.OUT_OF_STOCK
