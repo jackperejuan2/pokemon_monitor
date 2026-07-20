@@ -196,7 +196,7 @@ def test_render_tolerates_bad_price_string():
 def test_out_of_stock_under_max_is_not_a_buy():
     from datetime import datetime
     import dashboard as d
-    p = _product("PC ETB", "pokemoncenter", "Mega Evolution (base)", 11, 110)
+    p = _product("Chaos ETB", "ebgames", "Mega Evolution (base)", 11, 110)
     recs = {p.key: d.DashboardRecord(last_price="80.99", last_status="out_of_stock",
                                      lowest_price="80.99")}
     html = d.render_html([p], recs, datetime(2026, 7, 4, 12, 0, 0), healthy=True)

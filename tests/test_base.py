@@ -32,11 +32,11 @@ def test_raise_if_blocked_passes_normal_responses():
     raise_if_blocked(resp)  # no exception
 
 
-def test_registry_covers_all_seven_retailers():
+def test_registry_covers_all_six_retailers():
     from adapters import ADAPTERS
 
     assert set(ADAPTERS) == {
-        "bestbuy", "walmart", "toysrus", "indigo", "ebgames", "costco", "pokemoncenter",
+        "bestbuy", "walmart", "toysrus", "indigo", "ebgames", "costco",
     }
     for adapter in ADAPTERS.values():
         assert callable(getattr(adapter, "check", None))
