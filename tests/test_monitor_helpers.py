@@ -10,7 +10,6 @@ from state import ProductState
 
 CONFIG = {
     "check_interval_seconds": [120, 300],
-    "pokemoncenter_interval_seconds": [600, 900],
     "quiet_hours": {"start": "01:30", "end": "07:00"},
 }
 
@@ -54,7 +53,6 @@ def test_interval_in_configured_range():
     h = RetailerHealth()
     for _ in range(50):
         assert 120 <= check_interval(product("bestbuy"), CONFIG, h) <= 300
-        assert 600 <= check_interval(product("pokemoncenter"), CONFIG, h) <= 900
 
 
 def test_backoff_doubles_and_caps():
@@ -165,9 +163,7 @@ def test_process_product_survives_state_save_failure(monkeypatch):
 
 OVERRIDE_CONFIG = {
     "check_interval_seconds": [120, 300],
-    "pokemoncenter_interval_seconds": [600, 900],
     "interval_overrides": {
-        "pokemoncenter": [600, 900],
         "walmart": [600, 900],
         "ebgames": [600, 900],
     },
@@ -179,7 +175,6 @@ def test_interval_overrides_respected():
     for _ in range(50):
         assert 600 <= check_interval(product("walmart"), OVERRIDE_CONFIG, h) <= 900
         assert 600 <= check_interval(product("ebgames"), OVERRIDE_CONFIG, h) <= 900
-        assert 600 <= check_interval(product("pokemoncenter"), OVERRIDE_CONFIG, h) <= 900
         # retailer with no override still uses the base config tier
         assert 120 <= check_interval(product("bestbuy"), OVERRIDE_CONFIG, h) <= 300
 
@@ -188,30 +183,11 @@ def test_interval_override_malformed_falls_back_to_next_tier():
     h = RetailerHealth()
     config = {
         "check_interval_seconds": [120, 300],
-        "pokemoncenter_interval_seconds": [600, 900],
         "interval_overrides": {"walmart": 999},  # single number, not a 2-element range
     }
     for _ in range(50):
         # malformed override -> falls through to check_interval_seconds tier
         assert 120 <= check_interval(product("walmart"), config, h) <= 300
-
-
-def test_interval_override_malformed_for_pokemoncenter_falls_back_to_legacy_key():
-    h = RetailerHealth()
-    config = {
-        "check_interval_seconds": [120, 300],
-        "pokemoncenter_interval_seconds": [600, 900],
-        "interval_overrides": {"pokemoncenter": [100]},  # bad shape
-    }
-    for _ in range(50):
-        assert 600 <= check_interval(product("pokemoncenter"), config, h) <= 900
-
-
-def test_legacy_pokemoncenter_behavior_preserved_without_override():
-    # No interval_overrides key at all: legacy behavior must be unchanged.
-    h = RetailerHealth()
-    for _ in range(50):
-        assert 600 <= check_interval(product("pokemoncenter"), CONFIG, h) <= 900
         assert 120 <= check_interval(product("bestbuy"), CONFIG, h) <= 300
 
 

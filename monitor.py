@@ -389,12 +389,6 @@ def check_interval(product: Product, config: dict, health: RetailerHealth,
             overrides[product.retailer], f"interval_overrides.{product.retailer}"
         )
 
-    if low_high is None and product.retailer == "pokemoncenter":
-        if "pokemoncenter_interval_seconds" in config:
-            low_high = _parse_interval_range(
-                config["pokemoncenter_interval_seconds"], "pokemoncenter_interval_seconds"
-            )
-
     if low_high is None and "check_interval_seconds" in config:
         low_high = _parse_interval_range(
             config["check_interval_seconds"], "check_interval_seconds"
